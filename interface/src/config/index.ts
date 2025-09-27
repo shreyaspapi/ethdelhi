@@ -1,5 +1,5 @@
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi';
-import { mainnet, arbitrum } from '@reown/appkit/networks';
+import { mainnet, arbitrum, sepolia } from '@reown/appkit/networks';
 import type { AppKitNetwork } from '@reown/appkit/networks';
 
 // Get projectId from https://dashboard.reown.com
@@ -10,7 +10,7 @@ if (!projectId) {
   throw new Error('Project ID is not defined');
 }
 
-export const networks = [mainnet, arbitrum] as [
+export const networks = [mainnet, arbitrum, sepolia] as [
   AppKitNetwork,
   ...AppKitNetwork[]
 ];
@@ -28,3 +28,4 @@ export const config = wagmiAdapter.wagmiConfig;
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3001';
 export const ENS_LOOKUP_ENDPOINT = '/ens-lookup';
+export const FACE_BY_ENS_ENDPOINT = '/face-by-ens';
