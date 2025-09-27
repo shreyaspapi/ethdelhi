@@ -1,0 +1,73 @@
+{
+  "docusaurus-plugin-content-docs": {
+    "default": {
+      "path": "/docs",
+      "versions": [
+        {
+          "name": "current",
+          "label": "Next",
+          "isLast": true,
+          "path": "/docs",
+          "mainDocId": "intro",
+          "docs": [
+            {
+              "id": "api-reference",
+              "path": "/docs/api-reference",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "configuration",
+              "path": "/docs/configuration",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "curl-examples",
+              "path": "/docs/curl-examples",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "ethereum-endpoints",
+              "path": "/docs/ethereum-endpoints",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "face-recognition-endpoints",
+              "path": "/docs/face-recognition-endpoints",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "image-storage-endpoints",
+              "path": "/docs/image-storage-endpoints",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "installation",
+              "path": "/docs/installation",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "intro",
+              "path": "/docs/intro",
+              "sidebar": "tutorialSidebar"
+            },
+            {
+              "id": "usage-examples",
+              "path": "/docs/usage-examples",
+              "sidebar": "tutorialSidebar"
+            }
+          ],
+          "draftIds": [],
+          "sidebars": {
+            "tutorialSidebar": {
+              "link": {
+                "path": "/docs/intro",
+                "label": "intro"
+              }
+            }
+          }
+        }
+      ],
+      "breadcrumbs": true
+    }
+  }
+}

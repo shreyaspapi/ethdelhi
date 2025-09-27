@@ -1,0 +1,24 @@
+{
+  "id": "api-reference",
+  "title": "API Reference",
+  "description": "Complete reference for all API endpoints in the Ethereum Server API.",
+  "source": "@site/docs/api-reference.md",
+  "sourceDirName": ".",
+  "slug": "/api-reference",
+  "permalink": "/docs/api-reference",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/your-org/ethereum-server-docs/tree/main/docs/api-reference.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Configuration",
+    "permalink": "/docs/configuration"
+  },
+  "next": {
+    "title": "Ethereum Endpoints",
+    "permalink": "/docs/ethereum-endpoints"
+  }
+}

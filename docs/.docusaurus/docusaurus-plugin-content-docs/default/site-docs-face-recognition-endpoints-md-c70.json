@@ -1,0 +1,24 @@
+{
+  "id": "face-recognition-endpoints",
+  "title": "Face Recognition Endpoints",
+  "description": "Detailed documentation for face detection and recognition capabilities using computer vision and machine learning.",
+  "source": "@site/docs/face-recognition-endpoints.md",
+  "sourceDirName": ".",
+  "slug": "/face-recognition-endpoints",
+  "permalink": "/docs/face-recognition-endpoints",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/your-org/ethereum-server-docs/tree/main/docs/face-recognition-endpoints.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Image Storage Endpoints",
+    "permalink": "/docs/image-storage-endpoints"
+  },
+  "next": {
+    "title": "Usage Examples",
+    "permalink": "/docs/usage-examples"
+  }
+}

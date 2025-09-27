@@ -1,0 +1,24 @@
+{
+  "id": "configuration",
+  "title": "Configuration",
+  "description": "This guide covers all configuration options for the Ethereum Server API.",
+  "source": "@site/docs/configuration.md",
+  "sourceDirName": ".",
+  "slug": "/configuration",
+  "permalink": "/docs/configuration",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/your-org/ethereum-server-docs/tree/main/docs/configuration.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Installation",
+    "permalink": "/docs/installation"
+  },
+  "next": {
+    "title": "API Reference",
+    "permalink": "/docs/api-reference"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "id": "curl-examples",
+  "title": "Curl Examples",
+  "description": "Command-line examples for testing the Ethereum Server API using curl.",
+  "source": "@site/docs/curl-examples.md",
+  "sourceDirName": ".",
+  "slug": "/curl-examples",
+  "permalink": "/docs/curl-examples",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/your-org/ethereum-server-docs/tree/main/docs/curl-examples.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Usage Examples",
+    "permalink": "/docs/usage-examples"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "ethereum-endpoints",
+  "title": "Ethereum Endpoints",
+  "description": "Detailed documentation for Ethereum-related API endpoints including signature verification and ENS operations.",
+  "source": "@site/docs/ethereum-endpoints.md",
+  "sourceDirName": ".",
+  "slug": "/ethereum-endpoints",
+  "permalink": "/docs/ethereum-endpoints",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/your-org/ethereum-server-docs/tree/main/docs/ethereum-endpoints.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "API Reference",
+    "permalink": "/docs/api-reference"
+  },
+  "next": {
+    "title": "Image Storage Endpoints",
+    "permalink": "/docs/image-storage-endpoints"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "usage-examples",
+  "title": "Usage Examples",
+  "description": "Practical examples demonstrating how to use the Ethereum Server API in real-world scenarios.",
+  "source": "@site/docs/usage-examples.md",
+  "sourceDirName": ".",
+  "slug": "/usage-examples",
+  "permalink": "/docs/usage-examples",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/your-org/ethereum-server-docs/tree/main/docs/usage-examples.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Face Recognition Endpoints",
+    "permalink": "/docs/face-recognition-endpoints"
+  },
+  "next": {
+    "title": "Curl Examples",
+    "permalink": "/docs/curl-examples"
+  }
+}

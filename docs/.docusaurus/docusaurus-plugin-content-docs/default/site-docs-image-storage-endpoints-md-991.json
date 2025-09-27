@@ -1,0 +1,24 @@
+{
+  "id": "image-storage-endpoints",
+  "title": "Image Storage Endpoints",
+  "description": "Detailed documentation for image upload and storage using Akave O3 decentralized storage.",
+  "source": "@site/docs/image-storage-endpoints.md",
+  "sourceDirName": ".",
+  "slug": "/image-storage-endpoints",
+  "permalink": "/docs/image-storage-endpoints",
+  "draft": false,
+  "unlisted": false,
+  "editUrl": "https://github.com/your-org/ethereum-server-docs/tree/main/docs/image-storage-endpoints.md",
+  "tags": [],
+  "version": "current",
+  "frontMatter": {},
+  "sidebar": "tutorialSidebar",
+  "previous": {
+    "title": "Ethereum Endpoints",
+    "permalink": "/docs/ethereum-endpoints"
+  },
+  "next": {
+    "title": "Face Recognition Endpoints",
+    "permalink": "/docs/face-recognition-endpoints"
+  }
+}
