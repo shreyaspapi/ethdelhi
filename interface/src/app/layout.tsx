@@ -4,6 +4,8 @@ import './globals.css';
 import { ThemeProvider } from '@/components/theme-provider';
 import { headers } from 'next/headers';
 import ContextProvider from '@/context';
+import { ConnectButton } from '@/components/connect-button';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -40,6 +42,12 @@ export default async function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
+            <header className="w-full flex justify-end">
+              <div className="flex items-center gap-4">
+                <ConnectButton />
+                <ThemeToggle />
+              </div>
+            </header>
             {children}
           </ThemeProvider>
         </ContextProvider>

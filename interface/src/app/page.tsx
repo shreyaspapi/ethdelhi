@@ -1,8 +1,6 @@
 'use client';
 
 import { ActionButtonList } from '@/components/action-button-list';
-import { ConnectButton } from '@/components/connect-button';
-import { ThemeToggle } from '@/components/theme-toggle';
 import { InfoList } from '@/components/info-list';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -119,12 +117,6 @@ export default function Home() {
 
   return (
     <div className="font-sans flex flex-col items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-10">
-      <header className="w-full flex justify-end">
-        <div className="flex items-center gap-4">
-          <ConnectButton />
-          <ThemeToggle />
-        </div>
-      </header>
       <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
         {/* ENS Data Display */}
         {isConnected && address && (

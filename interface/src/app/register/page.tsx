@@ -32,6 +32,9 @@ export default function RegisterPage() {
   const [isCapturing, setIsCapturing] = useState(false);
   const [registrationMessage, setRegistrationMessage] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isSigning, setIsSigning] = useState(false);
+  const [messageSigned, setMessageSigned] = useState(false);
+  const [signature, setSignature] = useState<string | null>(null);
   const [ensData, setEnsData] = useState<Record<string, unknown> | null>(null);
 
   // Redirect if not connected
@@ -128,19 +131,64 @@ export default function RegisterPage() {
     setCurrentSlide(2);
   };
 
+  const handleSignMessage = async () => {
+    console.log('handleSignMessage called');
+    console.log('address:', address);
+    console.log('ensData:', ensData);
+    console.log('ensData?.ensName:', ensData?.ensName);
+
+    if (!address || !ensData?.ensName) {
+      console.log('Early return - missing address or ensData.ensName');
+      return;
+    }
+
+    console.log('Starting signing process...');
+    setIsSigning(true);
+    try {
+      const message =
+        registrationMessage || `Registering face for ENS: ${ensData.ensName}`;
+
+      console.log('Signing message:', message);
+      // Use wagmi's signMessage hook with proper mutation handling
+      signMessage(
+        { message: message },
+        {
+          onSuccess: (signatureResult) => {
+            console.log('onSuccess called with:', signatureResult);
+            setSignature(signatureResult);
+            setMessageSigned(true);
+            setIsSigning(false);
+            console.log('Message signed successfully:', signatureResult);
+          },
+          onError: (error) => {
+            console.error('onError called with:', error);
+            setIsSigning(false);
+            alert(
+              `Failed to sign message: ${
+                error instanceof Error ? error.message : 'Unknown error'
+              }`
+            );
+          },
+        }
+      );
+    } catch (error) {
+      console.error('Signing error:', error);
+      setIsSigning(false);
+      alert(
+        `Failed to sign message: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
+    }
+  };
+
   const registerFace = async () => {
-    if (!capturedImage || !address || !ensData?.name) return;
+    if (!capturedImage || !address || !ensData?.ensName || !signature) return;
 
     setIsRegistering(true);
     try {
-      // First, sign the message
       const message =
-        registrationMessage || `Registering face for ENS: ${ensData.name}`;
-      const signatureResult = await signMessage({ message });
-
-      if (typeof signatureResult !== 'string') {
-        throw new Error('Failed to sign message');
-      }
+        registrationMessage || `Registering face for ENS: ${ensData.ensName}`;
 
       // Convert base64 to blob
       const response = await fetch(capturedImage);
@@ -149,8 +197,8 @@ export default function RegisterPage() {
       // Create FormData
       const formData = new FormData();
       formData.append('image', blob, 'face.jpg');
-      formData.append('ensDomain', ensData.name as string);
-      formData.append('signature', signatureResult);
+      formData.append('ensDomain', ensData.ensName as string);
+      formData.append('signature', signature);
       formData.append('message', message);
 
       // Send to API
@@ -163,7 +211,7 @@ export default function RegisterPage() {
         const result = await apiResponse.json();
         console.log('Registration successful:', result);
         // Navigate to the user's profile page
-        router.push(`/${ensData.name}`);
+        router.push(`/${ensData.ensName}`);
       } else {
         const errorData = await apiResponse.json();
         throw new Error(errorData.error || 'Registration failed');
@@ -386,23 +434,24 @@ export default function RegisterPage() {
             <div className="text-6xl mb-4">✍️</div>
             <p>
               Add a personal message and sign it to verify your ENS domain
-              ownership.
+              ownership. This signature will be used to complete your
+              registration.
             </p>
           </div>
 
-          {ensData?.name && typeof ensData.name === 'string' ? (
+          {ensData?.ensName && typeof ensData.ensName === 'string' ? (
             <div className="p-4 bg-muted rounded-lg">
               <p className="text-sm text-muted-foreground">
                 Registering for ENS domain:
               </p>
-              <p className="font-semibold">{ensData.name}</p>
+              <p className="font-semibold">{ensData.ensName}</p>
             </div>
           ) : null}
 
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-2">
-                Personal Message (optional)
+                Personal Message (required)
               </label>
               <textarea
                 value={registrationMessage}
@@ -410,15 +459,48 @@ export default function RegisterPage() {
                 placeholder="Enter a personal message for your registration..."
                 className="w-full p-3 border rounded-lg resize-none"
                 rows={3}
+                required
               />
             </div>
-            <Button
-              onClick={registerFace}
-              disabled={isRegistering || !ensData?.name}
-              className="w-full"
-            >
-              {isRegistering ? 'Registering...' : 'Complete Registration'}
-            </Button>
+
+            {!messageSigned ? (
+              <div className="space-y-2">
+                <Button
+                  onClick={handleSignMessage}
+                  disabled={
+                    isSigning ||
+                    !registrationMessage.trim() ||
+                    !ensData?.ensName
+                  }
+                  className="w-full"
+                >
+                  {isSigning ? 'Signing Message...' : 'Sign Message'}
+                </Button>
+                <div className="text-xs text-muted-foreground">
+                  Debug: isSigning={isSigning.toString()}, hasMessage=
+                  {registrationMessage.trim().length > 0}, hasEnsName=
+                  {!!ensData?.ensName}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-center gap-2 text-green-600 p-4 bg-green-50 rounded-lg">
+                  <Check className="w-5 h-5" />
+                  <span className="font-medium">
+                    Message signed successfully!
+                  </span>
+                </div>
+                <Button
+                  onClick={registerFace}
+                  disabled={isRegistering}
+                  className="w-full"
+                >
+                  {isRegistering
+                    ? 'Completing Registration...'
+                    : 'Complete Registration'}
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       ),
@@ -553,16 +635,15 @@ export default function RegisterPage() {
                 ))}
               </div>
 
-              <Button
-                onClick={nextSlide}
-                disabled={
-                  currentSlide === onboardingSlides.length - 1 ||
-                  (currentSlide === 1 && cameraPermission !== true)
-                }
-              >
-                Next
-                <ChevronRight className="w-4 h-4 ml-2" />
-              </Button>
+              {currentSlide !== onboardingSlides.length - 1 && (
+                <Button
+                  onClick={nextSlide}
+                  disabled={currentSlide === 1 && cameraPermission !== true}
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4 ml-2" />
+                </Button>
+              )}
             </div>
           </div>
         </CardContent>
