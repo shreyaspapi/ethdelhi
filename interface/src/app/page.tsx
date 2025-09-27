@@ -105,8 +105,8 @@ export default function Home() {
   };
 
   const handleNavigation = () => {
-    if (ensData && ensData.name && typeof ensData.name === 'string') {
-      const ensName = ensData.name;
+    if (ensData && ensData.ensName && typeof ensData.ensName === 'string') {
+      const ensName = ensData.ensName;
       if (faceData) {
         // Navigate to profile page - user has face data (registered)
         router.push(`/${ensName}`);
@@ -189,7 +189,7 @@ export default function Home() {
                       </div>
                       <Button
                         onClick={handleNavigation}
-                        disabled={!ensData?.name}
+                        disabled={!ensData?.ensName}
                         className="ml-4"
                       >
                         {faceData ? 'View Profile' : 'Register'}
