@@ -1,6 +1,6 @@
 # Ethereum Endpoints
 
-Detailed documentation for Ethereum-related API endpoints including signature verification and ENS operations.
+Detailed documentation for Ethereum-related API endpoints including signature verification, ENS operations, and ENS resolver functionality on Sepolia testnet.
 
 ## Signature Verification
 
@@ -289,9 +289,209 @@ const resolveAddress = async (ensName) => {
 };
 ```
 
+## ENS Resolver Endpoints
+
+### GET /ens-resolver/:ensName
+
+Get ENS resolver information for a name on Sepolia testnet.
+
+#### Request
+
+**URL:** `GET /ens-resolver/{ensName}`
+
+**Parameters:**
+- `ensName` (string, required): ENS name to get resolver info for (e.g., "alice.eth")
+
+#### Response
+
+**Success (200):**
+```json
+{
+  "ensName": "alice.eth",
+  "namehash": "0x1234567890abcdef...",
+  "resolverAddress": "0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5",
+  "hasResolver": true
+}
+```
+
+**No Resolver (200):**
+```json
+{
+  "ensName": "alice.eth",
+  "namehash": "0x1234567890abcdef...",
+  "resolverAddress": null,
+  "hasResolver": false
+}
+```
+
+#### Example Usage
+
+```bash
+# Get resolver info for ENS name
+curl http://localhost:3000/ens-resolver/alice.eth
+```
+
+### GET /ens-text/:ensName/:key
+
+Get ENS text record for a specific key.
+
+#### Request
+
+**URL:** `GET /ens-text/{ensName}/{key}`
+
+**Parameters:**
+- `ensName` (string, required): ENS name to get text record for
+- `key` (string, required): Text record key (e.g., "description", "url", "avatar")
+
+#### Response
+
+**Success (200):**
+```json
+{
+  "ensName": "alice.eth",
+  "key": "description",
+  "value": "Alice's personal website",
+  "hasRecord": true
+}
+```
+
+**No Record (200):**
+```json
+{
+  "ensName": "alice.eth",
+  "key": "description",
+  "value": null,
+  "hasRecord": false
+}
+```
+
+#### Example Usage
+
+```bash
+# Get description text record
+curl http://localhost:3000/ens-text/alice.eth/description
+
+# Get URL text record
+curl http://localhost:3000/ens-text/alice.eth/url
+
+# Get avatar text record
+curl http://localhost:3000/ens-text/alice.eth/avatar
+```
+
+### GET /ens-contenthash/:ensName
+
+Get ENS content hash for IPFS/Arweave storage.
+
+#### Request
+
+**URL:** `GET /ens-contenthash/{ensName}`
+
+**Parameters:**
+- `ensName` (string, required): ENS name to get content hash for
+
+#### Response
+
+**Success (200):**
+```json
+{
+  "ensName": "alice.eth",
+  "contentHash": "0xe30101701220...",
+  "hasContentHash": true
+}
+```
+
+**No Content Hash (200):**
+```json
+{
+  "ensName": "alice.eth",
+  "contentHash": null,
+  "hasContentHash": false
+}
+```
+
+#### Example Usage
+
+```bash
+# Get content hash for ENS name
+curl http://localhost:3000/ens-contenthash/alice.eth
+```
+
+### GET /ens-info/:ensName
+
+Get comprehensive ENS information including address, text records, and content hash.
+
+#### Request
+
+**URL:** `GET /ens-info/{ensName}`
+
+**Parameters:**
+- `ensName` (string, required): ENS name to get comprehensive info for
+
+#### Response
+
+**Success (200):**
+```json
+{
+  "ensName": "alice.eth",
+  "namehash": "0x1234567890abcdef...",
+  "resolverAddress": "0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5",
+  "address": "0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6",
+  "contentHash": "0xe30101701220...",
+  "textRecords": {
+    "description": "Alice's personal website",
+    "url": "https://alice.example.com",
+    "avatar": "https://alice.example.com/avatar.jpg",
+    "twitter": "alice",
+    "github": "alice"
+  },
+  "hasResolver": true,
+  "hasAddress": true,
+  "hasContentHash": true
+}
+```
+
+#### Example Usage
+
+```bash
+# Get comprehensive ENS info
+curl http://localhost:3000/ens-info/alice.eth
+```
+
+#### JavaScript Example
+
+```javascript
+const getENSInfo = async (ensName) => {
+  const response = await fetch(`http://localhost:3000/ens-info/${ensName}`);
+  const result = await response.json();
+  return result;
+};
+
+// Usage
+const displayENSInfo = async (ensName) => {
+  const info = await getENSInfo(ensName);
+  
+  if (info.hasAddress) {
+    console.log(`ENS: ${info.ensName}`);
+    console.log(`Address: ${info.address}`);
+    console.log(`Description: ${info.textRecords.description || 'No description'}`);
+    console.log(`Website: ${info.textRecords.url || 'No website'}`);
+  } else {
+    console.log(`ENS name ${ensName} not found or not resolvable`);
+  }
+};
+```
+
+## Sepolia Testnet Configuration
+
+The server is configured to use Sepolia testnet with the following ENS contract addresses:
+
+- **Registry**: `0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e`
+- **Public Resolver**: `0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5`
+- **Universal Resolver**: `0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe`
+
 ## Next Steps
 
 - [Image Storage Endpoints](./image-storage-endpoints.md) - Image upload and storage
-- [Face Recognition Endpoints](./face-recognition-endpoints.md) - Face detection and recognition
+- [Face Recognition Endpoints](./face-recognition-endpoints.md) - Face detection and recognition with ENS integration
 - [Usage Examples](./usage-examples.md) - Practical examples
 - [Curl Examples](./curl-examples.md) - Command-line examples

@@ -1,6 +1,6 @@
 # Face Recognition Endpoints
 
-Detailed documentation for face detection and recognition capabilities using computer vision and machine learning.
+Detailed documentation for face detection and recognition capabilities with ENS domain integration using computer vision and machine learning.
 
 ## Face Detection
 
@@ -78,11 +78,11 @@ detectFaces(imageFile).then(result => {
 });
 ```
 
-## Face Registration
+## Face Registration with ENS Domain
 
 ### POST /register-face
 
-Register a face for future recognition using a unique identifier.
+Register a face for future recognition linked to an ENS domain. Requires cryptographic proof of ENS domain ownership.
 
 #### Request
 
@@ -90,7 +90,9 @@ Register a face for future recognition using a unique identifier.
 
 **Form Data:**
 - `image` (file, required): Image file containing the face to register
-- `identifier` (string, required): Unique identifier for the face
+- `ensDomain` (string, required): ENS domain name (e.g., "alice.eth")
+- `signature` (string, required): Ethereum signature proving domain ownership
+- `message` (string, required): The message that was signed
 
 #### Response
 
@@ -98,9 +100,10 @@ Register a face for future recognition using a unique identifier.
 ```json
 {
   "success": true,
-  "identifier": "john_doe",
+  "ensDomain": "alice.eth",
+  "ownerAddress": "0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6",
   "totalFaces": 5,
-  "message": "Face registered successfully"
+  "message": "Face registered successfully with ENS domain"
 }
 ```
 
@@ -114,33 +117,45 @@ Register a face for future recognition using a unique identifier.
 **Error (400):**
 ```json
 {
-  "error": "Identifier is required"
+  "error": "ENS domain, signature, and message are required"
 }
 ```
 
 **Error (400):**
 ```json
 {
-  "error": "Identifier already exists"
+  "error": "Invalid ENS domain ownership verification",
+  "details": "Signature does not match ENS domain owner"
+}
+```
+
+**Error (400):**
+```json
+{
+  "error": "ENS domain already registered"
 }
 ```
 
 #### Example Usage
 
 ```bash
-# Register a face
+# Register a face with ENS domain
 curl -X POST http://localhost:3000/register-face \
   -F "image=@/path/to/face.jpg" \
-  -F "identifier=john_doe"
+  -F "ensDomain=alice.eth" \
+  -F "signature=0x1234567890abcdef..." \
+  -F "message=Link face to alice.eth"
 ```
 
 #### JavaScript Example
 
 ```javascript
-const registerFace = async (imageFile, identifier) => {
+const registerFaceWithENS = async (imageFile, ensDomain, signature, message) => {
   const formData = new FormData();
   formData.append('image', imageFile);
-  formData.append('identifier', identifier);
+  formData.append('ensDomain', ensDomain);
+  formData.append('signature', signature);
+  formData.append('message', message);
 
   const response = await fetch('http://localhost:3000/register-face', {
     method: 'POST',
@@ -151,12 +166,20 @@ const registerFace = async (imageFile, identifier) => {
   return result;
 };
 
-// Usage
-const registerUserFace = async (userId, imageFile) => {
-  const result = await registerFace(imageFile, `user_${userId}`);
+// Usage with MetaMask signature
+const registerUserFaceWithENS = async (imageFile, ensDomain) => {
+  // Get user to sign a message proving ENS ownership
+  const message = `Link face to ${ensDomain}`;
+  const signature = await ethereum.request({
+    method: 'personal_sign',
+    params: [message, ethereum.selectedAddress]
+  });
+  
+  const result = await registerFaceWithENS(imageFile, ensDomain, signature, message);
   
   if (result.success) {
-    console.log(`Face registered for user ${userId}`);
+    console.log(`Face registered for ENS domain ${ensDomain}`);
+    console.log(`Owner address: ${result.ownerAddress}`);
   }
 };
 ```
@@ -181,7 +204,8 @@ Recognize a face from an uploaded image by comparing against registered faces.
 {
   "success": true,
   "match": {
-    "identifier": "john_doe",
+    "ensDomain": "alice.eth",
+    "ownerAddress": "0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6",
     "confidence": 0.85,
     "registeredAt": "2024-01-01T00:00:00.000Z"
   },
@@ -234,7 +258,8 @@ const authenticateUser = async (imageFile) => {
   const result = await recognizeFace(imageFile);
   
   if (result.match) {
-    console.log(`User recognized: ${result.match.identifier}`);
+    console.log(`User recognized: ${result.match.ensDomain}`);
+    console.log(`Owner address: ${result.match.ownerAddress}`);
     console.log(`Confidence: ${result.match.confidence}`);
   } else {
     console.log('No matching face found');
@@ -256,12 +281,14 @@ Get all registered faces with their metadata.
   "success": true,
   "faces": [
     {
-      "identifier": "john_doe",
+      "ensDomain": "alice.eth",
+      "ownerAddress": "0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6",
       "registeredAt": "2024-01-01T00:00:00.000Z",
       "imageSize": 245760
     },
     {
-      "identifier": "jane_smith",
+      "ensDomain": "bob.eth",
+      "ownerAddress": "0x8ba1f109551bD432803012645Hac136c",
       "registeredAt": "2024-01-02T00:00:00.000Z",
       "imageSize": 198432
     }
@@ -290,21 +317,83 @@ const getRegisteredFaces = async () => {
 getRegisteredFaces().then(result => {
   console.log(`Total registered faces: ${result.totalCount}`);
   result.faces.forEach(face => {
-    console.log(`- ${face.identifier} (registered: ${face.registeredAt})`);
+    console.log(`- ${face.ensDomain} (owner: ${face.ownerAddress}, registered: ${face.registeredAt})`);
   });
 });
 ```
 
-### DELETE /registered-faces/:identifier
+### GET /face-by-ens/:ensDomain
 
-Delete a registered face by its identifier.
+Get face information by ENS domain.
 
 #### Request
 
-**URL:** `DELETE /registered-faces/{identifier}`
+**URL:** `GET /face-by-ens/{ensDomain}`
 
 **Parameters:**
-- `identifier` (string, required): Identifier of the face to delete
+- `ensDomain` (string, required): ENS domain to look up
+
+#### Response
+
+**Success (200):**
+```json
+{
+  "success": true,
+  "face": {
+    "ensDomain": "alice.eth",
+    "ownerAddress": "0x742d35Cc6634C0532925a3b8D4C9db96C4b4d8b6",
+    "registeredAt": "2024-01-01T00:00:00.000Z",
+    "imageSize": 245760
+  }
+}
+```
+
+**Error (404):**
+```json
+{
+  "error": "Face not found for ENS domain"
+}
+```
+
+#### Example Usage
+
+```bash
+# Get face by ENS domain
+curl http://localhost:3000/face-by-ens/alice.eth
+```
+
+#### JavaScript Example
+
+```javascript
+const getFaceByENS = async (ensDomain) => {
+  const response = await fetch(`http://localhost:3000/face-by-ens/${ensDomain}`);
+  const result = await response.json();
+  return result;
+};
+
+// Usage
+const checkUserFace = async (ensDomain) => {
+  const result = await getFaceByENS(ensDomain);
+  
+  if (result.success) {
+    console.log(`Face found for ${result.face.ensDomain}`);
+    console.log(`Owner: ${result.face.ownerAddress}`);
+  } else {
+    console.log(`No face registered for ${ensDomain}`);
+  }
+};
+```
+
+### DELETE /registered-faces/:ensDomain
+
+Delete a registered face by ENS domain.
+
+#### Request
+
+**URL:** `DELETE /registered-faces/{ensDomain}`
+
+**Parameters:**
+- `ensDomain` (string, required): ENS domain of the face to delete
 
 #### Response
 
@@ -320,22 +409,22 @@ Delete a registered face by its identifier.
 **Error (404):**
 ```json
 {
-  "error": "Face not found"
+  "error": "Face not found for ENS domain"
 }
 ```
 
 #### Example Usage
 
 ```bash
-# Delete a registered face
-curl -X DELETE http://localhost:3000/registered-faces/john_doe
+# Delete a registered face by ENS domain
+curl -X DELETE http://localhost:3000/registered-faces/alice.eth
 ```
 
 #### JavaScript Example
 
 ```javascript
-const deleteFace = async (identifier) => {
-  const response = await fetch(`http://localhost:3000/registered-faces/${identifier}`, {
+const deleteFaceByENS = async (ensDomain) => {
+  const response = await fetch(`http://localhost:3000/registered-faces/${ensDomain}`, {
     method: 'DELETE'
   });
 
@@ -344,16 +433,56 @@ const deleteFace = async (identifier) => {
 };
 
 // Usage
-const removeUserFace = async (userId) => {
-  const result = await deleteFace(`user_${userId}`);
+const removeUserFaceByENS = async (ensDomain) => {
+  const result = await deleteFaceByENS(ensDomain);
   
   if (result.success) {
-    console.log(`Face deleted for user ${userId}`);
+    console.log(`Face deleted for ENS domain ${ensDomain}`);
   }
 };
 ```
 
 ## Implementation Details
+
+### ENS Domain Verification
+
+The face registration process includes cryptographic verification of ENS domain ownership:
+
+```javascript
+async function verifyENSOwnership(ensDomain, signature, message) {
+  try {
+    // Verify the signature
+    const recoveredAddress = ethers.verifyMessage(message, signature);
+    
+    // Resolve ENS domain to address
+    const domainAddress = await resolveAddress(ensDomain);
+    
+    if (!domainAddress) {
+      return {
+        isValid: false,
+        error: 'ENS domain not found or not resolvable'
+      };
+    }
+    
+    // Check if the recovered address matches the ENS domain address
+    const isOwner = recoveredAddress.toLowerCase() === domainAddress.toLowerCase();
+    
+    return {
+      isValid: isOwner,
+      address: recoveredAddress,
+      domainAddress: domainAddress,
+      error: isOwner ? null : 'Signature does not match ENS domain owner'
+    };
+    
+  } catch (error) {
+    console.error('ENS ownership verification error:', error);
+    return {
+      isValid: false,
+      error: 'Failed to verify ENS ownership: ' + error.message
+    };
+  }
+}
+```
 
 ### Face Detection Algorithm
 
@@ -401,7 +530,8 @@ function findBestMatch(descriptor) {
     if (similarity > threshold && similarity > bestScore) {
       bestScore = similarity;
       bestMatch = {
-        identifier: face.identifier,
+        ensDomain: face.ensDomain,
+        ownerAddress: face.ownerAddress,
         confidence: similarity,
         registeredAt: face.registeredAt
       };
@@ -456,15 +586,19 @@ function findBestMatch(descriptor) {
 
 ## Common Use Cases
 
-### 1. User Authentication
+### 1. User Authentication with ENS Identity
 
 ```javascript
-const authenticateWithFace = async (imageFile) => {
+const authenticateWithFaceAndENS = async (imageFile) => {
   const result = await recognizeFace(imageFile);
   
   if (result.match && result.match.confidence > 0.8) {
-    // User authenticated successfully
-    return { authenticated: true, userId: result.match.identifier };
+    // User authenticated successfully with ENS domain
+    return { 
+      authenticated: true, 
+      ensDomain: result.match.ensDomain,
+      ownerAddress: result.match.ownerAddress 
+    };
   } else {
     // Authentication failed
     return { authenticated: false };
@@ -472,30 +606,38 @@ const authenticateWithFace = async (imageFile) => {
 };
 ```
 
-### 2. Access Control
+### 2. Access Control with ENS Domain
 
 ```javascript
-const checkAccess = async (imageFile, requiredIdentifier) => {
+const checkAccessWithENS = async (imageFile, requiredEnsDomain) => {
   const result = await recognizeFace(imageFile);
   
-  if (result.match && result.match.identifier === requiredIdentifier) {
-    return { access: true, confidence: result.match.confidence };
+  if (result.match && result.match.ensDomain === requiredEnsDomain) {
+    return { 
+      access: true, 
+      confidence: result.match.confidence,
+      ownerAddress: result.match.ownerAddress 
+    };
   } else {
     return { access: false };
   }
 };
 ```
 
-### 3. Attendance System
+### 3. Attendance System with ENS Identity
 
 ```javascript
-const markAttendance = async (imageFile, eventId) => {
+const markAttendanceWithENS = async (imageFile, eventId) => {
   const result = await recognizeFace(imageFile);
   
   if (result.match) {
-    // Record attendance
-    await recordAttendance(eventId, result.match.identifier);
-    return { success: true, user: result.match.identifier };
+    // Record attendance with ENS domain
+    await recordAttendance(eventId, result.match.ensDomain, result.match.ownerAddress);
+    return { 
+      success: true, 
+      ensDomain: result.match.ensDomain,
+      ownerAddress: result.match.ownerAddress 
+    };
   } else {
     return { success: false, error: 'Face not recognized' };
   }

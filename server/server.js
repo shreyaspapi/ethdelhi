@@ -15,8 +15,33 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-// Provider for mainnet (you can change this to other networks)
-const provider = new ethers.JsonRpcProvider('https://eth.llamarpc.com');
+// Provider for Sepolia testnet
+const provider = new ethers.JsonRpcProvider('https://api.zan.top/eth-sepolia');
+
+// ENS Sepolia Contract Addresses
+const ENS_CONTRACTS = {
+  registry: '0x00000000000C2E074eC69A0dFb2997BA6C7d2e1e',
+  publicResolver: '0xE99638b40E4Fff0129D56f03b55b6bbC4BBE49b5',
+  universalResolver: '0xeEeEEEeE14D718C2B47D9923Deab1335E144EeEe'
+};
+
+// ENS Registry ABI (minimal for our needs)
+const ENS_REGISTRY_ABI = [
+  "function resolver(bytes32 node) external view returns (address)",
+  "function owner(bytes32 node) external view returns (address)"
+];
+
+// Public Resolver ABI (minimal for our needs)
+const PUBLIC_RESOLVER_ABI = [
+  "function addr(bytes32 node) external view returns (address)",
+  "function text(bytes32 node, string calldata key) external view returns (string memory)",
+  "function contenthash(bytes32 node) external view returns (bytes memory)"
+];
+
+// Universal Resolver ABI
+const UNIVERSAL_RESOLVER_ABI = [
+  "function resolve(bytes calldata name, bytes calldata data) external view returns (bytes memory)"
+];
 
 // Akave O3 S3 Configuration
 const s3Client = new S3Client({
@@ -154,6 +179,137 @@ app.get('/reverse-ens/:ensName', async (req, res) => {
 });
 
 /**
+ * Get ENS resolver information for a name
+ * GET /ens-resolver/:ensName
+ */
+app.get('/ens-resolver/:ensName', async (req, res) => {
+  try {
+    const { ensName } = req.params;
+
+    const resolverAddress = await getResolver(ensName);
+    const namehash = getNamehash(ensName);
+
+    res.json({
+      ensName,
+      namehash,
+      resolverAddress: resolverAddress === '0x0000000000000000000000000000000000000000' ? null : resolverAddress,
+      hasResolver: resolverAddress !== '0x0000000000000000000000000000000000000000'
+    });
+
+  } catch (error) {
+    console.error('ENS resolver lookup error:', error);
+    res.status(500).json({
+      error: 'Failed to get ENS resolver',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get ENS text record
+ * GET /ens-text/:ensName/:key
+ */
+app.get('/ens-text/:ensName/:key', async (req, res) => {
+  try {
+    const { ensName, key } = req.params;
+
+    const textValue = await getTextRecord(ensName, key);
+
+    res.json({
+      ensName,
+      key,
+      value: textValue,
+      hasRecord: textValue !== null && textValue !== ''
+    });
+
+  } catch (error) {
+    console.error('ENS text record lookup error:', error);
+    res.status(500).json({
+      error: 'Failed to get ENS text record',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get ENS content hash
+ * GET /ens-contenthash/:ensName
+ */
+app.get('/ens-contenthash/:ensName', async (req, res) => {
+  try {
+    const { ensName } = req.params;
+
+    const contentHash = await getContentHash(ensName);
+
+    res.json({
+      ensName,
+      contentHash: contentHash,
+      hasContentHash: contentHash !== null && contentHash !== '0x'
+    });
+
+  } catch (error) {
+    console.error('ENS content hash lookup error:', error);
+    res.status(500).json({
+      error: 'Failed to get ENS content hash',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get comprehensive ENS information
+ * GET /ens-info/:ensName
+ */
+app.get('/ens-info/:ensName', async (req, res) => {
+  try {
+    const { ensName } = req.params;
+
+    // Get all ENS information in parallel
+    const [resolverAddress, address, contentHash] = await Promise.all([
+      getResolver(ensName),
+      resolveAddress(ensName),
+      getContentHash(ensName)
+    ]);
+
+    // Get common text records
+    const [description, url, avatar, twitter, github] = await Promise.all([
+      getTextRecord(ensName, 'description'),
+      getTextRecord(ensName, 'url'),
+      getTextRecord(ensName, 'avatar'),
+      getTextRecord(ensName, 'com.twitter'),
+      getTextRecord(ensName, 'com.github')
+    ]);
+
+    const namehash = getNamehash(ensName);
+
+    res.json({
+      ensName,
+      namehash,
+      resolverAddress: resolverAddress === '0x0000000000000000000000000000000000000000' ? null : resolverAddress,
+      address,
+      contentHash,
+      textRecords: {
+        description,
+        url,
+        avatar,
+        twitter,
+        github
+      },
+      hasResolver: resolverAddress !== '0x0000000000000000000000000000000000000000',
+      hasAddress: address !== null,
+      hasContentHash: contentHash !== null && contentHash !== '0x'
+    });
+
+  } catch (error) {
+    console.error('ENS info lookup error:', error);
+    res.status(500).json({
+      error: 'Failed to get ENS information',
+      details: error.message
+    });
+  }
+});
+
+/**
  * Upload image to Akave O3
  * POST /upload-image
  * Body: FormData with 'image' field and optional 'bucket' field
@@ -283,9 +439,9 @@ app.post('/detect-faces', upload.single('image'), async (req, res) => {
 });
 
 /**
- * Register a face for recognition
+ * Register a face for recognition with ENS domain
  * POST /register-face
- * Body: FormData with 'image' and 'identifier' fields
+ * Body: FormData with 'image', 'ensDomain', 'signature', and 'message' fields
  */
 app.post('/register-face', upload.single('image'), async (req, res) => {
   try {
@@ -295,18 +451,27 @@ app.post('/register-face', upload.single('image'), async (req, res) => {
       });
     }
 
-    const { identifier } = req.body;
+    const { ensDomain, signature, message } = req.body;
 
-    if (!identifier) {
+    if (!ensDomain || !signature || !message) {
       return res.status(400).json({
-        error: 'Identifier is required'
+        error: 'ENS domain, signature, and message are required'
       });
     }
 
-    // Check if identifier already exists
-    if (registeredFaces.find(face => face.identifier === identifier)) {
+    // Verify ENS domain ownership
+    const domainOwner = await verifyENSOwnership(ensDomain, signature, message);
+    if (!domainOwner.isValid) {
       return res.status(400).json({
-        error: 'Identifier already exists'
+        error: 'Invalid ENS domain ownership verification',
+        details: domainOwner.error
+      });
+    }
+
+    // Check if ENS domain already exists
+    if (registeredFaces.find(face => face.ensDomain === ensDomain)) {
+      return res.status(400).json({
+        error: 'ENS domain already registered'
       });
     }
 
@@ -323,12 +488,15 @@ app.post('/register-face', upload.single('image'), async (req, res) => {
     // Create face descriptor (simplified - in production use proper face recognition)
     const faceDescriptor = await generateFaceDescriptor(processedBuffer);
 
-    // Store face data
+    // Store face data with ENS domain
     const faceData = {
-      identifier: identifier,
+      ensDomain: ensDomain,
       descriptor: faceDescriptor,
       registeredAt: new Date().toISOString(),
-      imageSize: file.size
+      imageSize: file.size,
+      ownerAddress: domainOwner.address,
+      message: message,
+      signature: signature
     };
 
     registeredFaces.push(faceData);
@@ -336,9 +504,10 @@ app.post('/register-face', upload.single('image'), async (req, res) => {
 
     res.json({
       success: true,
-      identifier: identifier,
+      ensDomain: ensDomain,
+      ownerAddress: domainOwner.address,
       totalFaces: registeredFaces.length,
-      message: 'Face registered successfully'
+      message: 'Face registered successfully with ENS domain'
     });
 
   } catch (error) {
@@ -389,7 +558,8 @@ app.post('/recognize-face', upload.single('image'), async (req, res) => {
       res.json({
         success: true,
         match: {
-          identifier: match.identifier,
+          ensDomain: match.ensDomain,
+          ownerAddress: match.ownerAddress,
           confidence: match.confidence,
           registeredAt: match.registeredAt
         },
@@ -421,7 +591,8 @@ app.get('/registered-faces', (req, res) => {
     res.json({
       success: true,
       faces: registeredFaces.map(face => ({
-        identifier: face.identifier,
+        ensDomain: face.ensDomain,
+        ownerAddress: face.ownerAddress,
         registeredAt: face.registeredAt,
         imageSize: face.imageSize
       })),
@@ -437,18 +608,53 @@ app.get('/registered-faces', (req, res) => {
 });
 
 /**
- * Delete a registered face
- * DELETE /registered-faces/:identifier
+ * Get face by ENS domain
+ * GET /face-by-ens/:ensDomain
  */
-app.delete('/registered-faces/:identifier', (req, res) => {
+app.get('/face-by-ens/:ensDomain', (req, res) => {
   try {
-    const { identifier } = req.params;
+    const { ensDomain } = req.params;
+    
+    const face = registeredFaces.find(f => f.ensDomain === ensDomain);
+    
+    if (!face) {
+      return res.status(404).json({
+        error: 'Face not found for ENS domain'
+      });
+    }
+    
+    res.json({
+      success: true,
+      face: {
+        ensDomain: face.ensDomain,
+        ownerAddress: face.ownerAddress,
+        registeredAt: face.registeredAt,
+        imageSize: face.imageSize
+      }
+    });
+    
+  } catch (error) {
+    console.error('Get face by ENS error:', error);
+    res.status(500).json({
+      error: 'Failed to get face by ENS domain',
+      details: error.message
+    });
+  }
+});
 
-    const faceIndex = registeredFaces.findIndex(face => face.identifier === identifier);
+/**
+ * Delete a registered face by ENS domain
+ * DELETE /registered-faces/:ensDomain
+ */
+app.delete('/registered-faces/:ensDomain', (req, res) => {
+  try {
+    const { ensDomain } = req.params;
+
+    const faceIndex = registeredFaces.findIndex(face => face.ensDomain === ensDomain);
 
     if (faceIndex === -1) {
       return res.status(404).json({
-        error: 'Face not found'
+        error: 'Face not found for ENS domain'
       });
     }
 
@@ -469,6 +675,129 @@ app.delete('/registered-faces/:identifier', (req, res) => {
     });
   }
 });
+
+// Helper functions for ENS resolver
+
+/**
+ * Verify ENS domain ownership through signature
+ */
+async function verifyENSOwnership(ensDomain, signature, message) {
+  try {
+    // Verify the signature
+    const recoveredAddress = ethers.verifyMessage(message, signature);
+    
+    // Resolve ENS domain to address
+    const domainAddress = await resolveAddress(ensDomain);
+    
+    if (!domainAddress) {
+      return {
+        isValid: false,
+        error: 'ENS domain not found or not resolvable'
+      };
+    }
+    
+    // Check if the recovered address matches the ENS domain address
+    const isOwner = recoveredAddress.toLowerCase() === domainAddress.toLowerCase();
+    
+    return {
+      isValid: isOwner,
+      address: recoveredAddress,
+      domainAddress: domainAddress,
+      error: isOwner ? null : 'Signature does not match ENS domain owner'
+    };
+    
+  } catch (error) {
+    console.error('ENS ownership verification error:', error);
+    return {
+      isValid: false,
+      error: 'Failed to verify ENS ownership: ' + error.message
+    };
+  }
+}
+
+/**
+ * Get the namehash for an ENS name
+ */
+function getNamehash(name) {
+  const labels = name.split('.').reverse();
+  let node = '0x0000000000000000000000000000000000000000000000000000000000000000';
+  
+  for (const label of labels) {
+    const labelHash = ethers.keccak256(ethers.toUtf8Bytes(label));
+    node = ethers.keccak256(ethers.concat([node, labelHash]));
+  }
+  
+  return node;
+}
+
+/**
+ * Get resolver address for a name
+ */
+async function getResolver(name) {
+  const namehash = getNamehash(name);
+  const registry = new ethers.Contract(ENS_CONTRACTS.registry, ENS_REGISTRY_ABI, provider);
+  return await registry.resolver(namehash);
+}
+
+/**
+ * Resolve address from ENS name using Public Resolver
+ */
+async function resolveAddress(name) {
+  try {
+    const namehash = getNamehash(name);
+    const resolverAddress = await getResolver(name);
+    
+    if (resolverAddress === '0x0000000000000000000000000000000000000000') {
+      return null;
+    }
+    
+    const resolver = new ethers.Contract(resolverAddress, PUBLIC_RESOLVER_ABI, provider);
+    return await resolver.addr(namehash);
+  } catch (error) {
+    console.error('Error resolving address:', error);
+    return null;
+  }
+}
+
+/**
+ * Get text record from ENS name
+ */
+async function getTextRecord(name, key) {
+  try {
+    const namehash = getNamehash(name);
+    const resolverAddress = await getResolver(name);
+    
+    if (resolverAddress === '0x0000000000000000000000000000000000000000') {
+      return null;
+    }
+    
+    const resolver = new ethers.Contract(resolverAddress, PUBLIC_RESOLVER_ABI, provider);
+    return await resolver.text(namehash, key);
+  } catch (error) {
+    console.error('Error getting text record:', error);
+    return null;
+  }
+}
+
+/**
+ * Get content hash from ENS name
+ */
+async function getContentHash(name) {
+  try {
+    const namehash = getNamehash(name);
+    const resolverAddress = await getResolver(name);
+    
+    if (resolverAddress === '0x0000000000000000000000000000000000000000') {
+      return null;
+    }
+    
+    const resolver = new ethers.Contract(resolverAddress, PUBLIC_RESOLVER_ABI, provider);
+    return await resolver.contenthash(namehash);
+  } catch (error) {
+    console.error('Error getting content hash:', error);
+    return null;
+  }
+}
 
 // Helper functions for face recognition
 
@@ -497,7 +826,8 @@ function findBestMatch(descriptor) {
     if (similarity > threshold && similarity > bestScore) {
       bestScore = similarity;
       bestMatch = {
-        identifier: face.identifier,
+        ensDomain: face.ensDomain,
+        ownerAddress: face.ownerAddress,
         confidence: similarity,
         registeredAt: face.registeredAt
       };
@@ -536,6 +866,8 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     message: 'Ethereum Signature Verifier, ENS Lookup, Akave O3 Image Upload & Face Recognition API',
+    network: 'Sepolia Testnet',
+    ensContracts: ENS_CONTRACTS,
     endpoints: {
       'POST /verify-signature': {
         description: 'Verify Ethereum signature',
@@ -547,6 +879,18 @@ app.get('/', (req, res) => {
       'GET /reverse-ens/:ensName': {
         description: 'Resolve ENS name to Ethereum address'
       },
+      'GET /ens-resolver/:ensName': {
+        description: 'Get ENS resolver information for a name'
+      },
+      'GET /ens-text/:ensName/:key': {
+        description: 'Get ENS text record for a specific key'
+      },
+      'GET /ens-contenthash/:ensName': {
+        description: 'Get ENS content hash'
+      },
+      'GET /ens-info/:ensName': {
+        description: 'Get comprehensive ENS information (address, text records, content hash)'
+      },
       'POST /upload-image': {
         description: 'Upload image to Akave O3 decentralized storage',
         body: 'FormData with image file and optional bucket name'
@@ -556,18 +900,21 @@ app.get('/', (req, res) => {
         body: 'FormData with image file'
       },
       'POST /register-face': {
-        description: 'Register a face for recognition',
-        body: 'FormData with image file and identifier'
+        description: 'Register a face for recognition with ENS domain',
+        body: 'FormData with image file, ensDomain, signature, and message'
       },
       'POST /recognize-face': {
         description: 'Recognize a face from uploaded image',
         body: 'FormData with image file'
       },
       'GET /registered-faces': {
-        description: 'Get all registered faces'
+        description: 'Get all registered faces with ENS domains'
       },
-      'DELETE /registered-faces/:identifier': {
-        description: 'Delete a registered face'
+      'GET /face-by-ens/:ensDomain': {
+        description: 'Get face information by ENS domain'
+      },
+      'DELETE /registered-faces/:ensDomain': {
+        description: 'Delete a registered face by ENS domain'
       },
       'GET /health': {
         description: 'Health check endpoint'

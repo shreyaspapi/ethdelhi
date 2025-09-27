@@ -1,6 +1,6 @@
 # Usage Examples
 
-Practical examples demonstrating how to use the Ethereum Server API in real-world scenarios.
+Practical examples demonstrating how to use the Ethereum Server API with ENS integration and face recognition in real-world scenarios.
 
 ## Quick Start Examples
 
@@ -42,6 +42,30 @@ curl -X POST http://localhost:3000/upload-image \
   -F "bucket=my-images"
 ```
 
+### 4. Get ENS Information
+
+```bash
+# Get comprehensive ENS info
+curl http://localhost:3000/ens-info/alice.eth
+
+# Get ENS text record
+curl http://localhost:3000/ens-text/alice.eth/description
+
+# Get ENS content hash
+curl http://localhost:3000/ens-contenthash/alice.eth
+```
+
+### 5. Register Face with ENS Domain
+
+```bash
+# Register face with ENS domain (requires signature)
+curl -X POST http://localhost:3000/register-face \
+  -F "image=@/path/to/face.jpg" \
+  -F "ensDomain=alice.eth" \
+  -F "signature=0x1234567890abcdef..." \
+  -F "message=Link face to alice.eth"
+```
+
 ## JavaScript Integration Examples
 
 ### 1. Complete API Client Class
@@ -80,6 +104,30 @@ class EthereumServerAPI {
     return await response.json();
   }
 
+  // ENS resolver info
+  async getENSResolver(ensName) {
+    const response = await fetch(`${this.baseUrl}/ens-resolver/${ensName}`);
+    return await response.json();
+  }
+
+  // ENS text record
+  async getENSTextRecord(ensName, key) {
+    const response = await fetch(`${this.baseUrl}/ens-text/${ensName}/${key}`);
+    return await response.json();
+  }
+
+  // ENS content hash
+  async getENSContentHash(ensName) {
+    const response = await fetch(`${this.baseUrl}/ens-contenthash/${ensName}`);
+    return await response.json();
+  }
+
+  // Comprehensive ENS info
+  async getENSInfo(ensName) {
+    const response = await fetch(`${this.baseUrl}/ens-info/${ensName}`);
+    return await response.json();
+  }
+
   // Upload image
   async uploadImage(imageFile, bucket = 'default-images') {
     const formData = new FormData();
@@ -105,16 +153,24 @@ class EthereumServerAPI {
     return await response.json();
   }
 
-  // Register face
-  async registerFace(imageFile, identifier) {
+  // Register face with ENS domain
+  async registerFaceWithENS(imageFile, ensDomain, signature, message) {
     const formData = new FormData();
     formData.append('image', imageFile);
-    formData.append('identifier', identifier);
+    formData.append('ensDomain', ensDomain);
+    formData.append('signature', signature);
+    formData.append('message', message);
 
     const response = await fetch(`${this.baseUrl}/register-face`, {
       method: 'POST',
       body: formData
     });
+    return await response.json();
+  }
+
+  // Get face by ENS domain
+  async getFaceByENS(ensDomain) {
+    const response = await fetch(`${this.baseUrl}/face-by-ens/${ensDomain}`);
     return await response.json();
   }
 
@@ -136,9 +192,9 @@ class EthereumServerAPI {
     return await response.json();
   }
 
-  // Delete face
-  async deleteFace(identifier) {
-    const response = await fetch(`${this.baseUrl}/registered-faces/${identifier}`, {
+  // Delete face by ENS domain
+  async deleteFaceByENS(ensDomain) {
+    const response = await fetch(`${this.baseUrl}/registered-faces/${ensDomain}`, {
       method: 'DELETE'
     });
     return await response.json();
@@ -154,7 +210,110 @@ api.health().then(result => {
 });
 ```
 
-### 2. Wallet Authentication System
+### 2. ENS Integration System
+
+```javascript
+class ENSIntegration {
+  constructor(api) {
+    this.api = api;
+  }
+
+  // Get comprehensive ENS information
+  async getENSProfile(ensName) {
+    const info = await this.api.getENSInfo(ensName);
+    
+    if (info.hasAddress) {
+      return {
+        ensName: info.ensName,
+        address: info.address,
+        description: info.textRecords.description,
+        website: info.textRecords.url,
+        avatar: info.textRecords.avatar,
+        twitter: info.textRecords.twitter,
+        github: info.textRecords.github,
+        contentHash: info.contentHash,
+        hasResolver: info.hasResolver
+      };
+    } else {
+      throw new Error(`ENS name ${ensName} not found or not resolvable`);
+    }
+  }
+
+  // Check if ENS domain has face registered
+  async hasFaceRegistered(ensName) {
+    try {
+      const face = await this.api.getFaceByENS(ensName);
+      return face.success;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  // Register face with ENS domain (requires MetaMask)
+  async registerFaceWithENS(ensName, imageFile) {
+    // Get user to sign a message proving ENS ownership
+    const message = `Link face to ${ensName}`;
+    const signature = await ethereum.request({
+      method: 'personal_sign',
+      params: [message, ethereum.selectedAddress]
+    });
+    
+    const result = await this.api.registerFaceWithENS(imageFile, ensName, signature, message);
+    
+    if (result.success) {
+      console.log(`Face registered for ENS domain ${ensName}`);
+      console.log(`Owner address: ${result.ownerAddress}`);
+      return { success: true, ensDomain: result.ensDomain, ownerAddress: result.ownerAddress };
+    } else {
+      throw new Error(`Face registration failed: ${result.error}`);
+    }
+  }
+
+  // Authenticate with face and get ENS identity
+  async authenticateWithFaceAndENS(imageFile) {
+    const result = await this.api.recognizeFace(imageFile);
+    
+    if (result.match && result.match.confidence > 0.8) {
+      return {
+        authenticated: true,
+        ensDomain: result.match.ensDomain,
+        ownerAddress: result.match.ownerAddress,
+        confidence: result.match.confidence
+      };
+    } else {
+      return { authenticated: false, error: 'Face not recognized' };
+    }
+  }
+}
+
+// Usage
+const ensIntegration = new ENSIntegration(api);
+
+// Get ENS profile
+const getENSProfile = async (ensName) => {
+  try {
+    const profile = await ensIntegration.getENSProfile(ensName);
+    console.log(`ENS Profile for ${profile.ensName}:`);
+    console.log(`Address: ${profile.address}`);
+    console.log(`Description: ${profile.description || 'No description'}`);
+    console.log(`Website: ${profile.website || 'No website'}`);
+  } catch (error) {
+    console.error('Error getting ENS profile:', error.message);
+  }
+};
+
+// Register face with ENS
+const registerFaceWithENS = async (ensName, imageFile) => {
+  try {
+    const result = await ensIntegration.registerFaceWithENS(ensName, imageFile);
+    console.log(`Face registered for ${result.ensDomain}`);
+  } catch (error) {
+    console.error('Registration failed:', error.message);
+  }
+};
+```
+
+### 3. Wallet Authentication System
 
 ```javascript
 class WalletAuth {
@@ -232,7 +391,7 @@ const authenticateUser = async (userId, signature, address) => {
 };
 ```
 
-### 3. Face Recognition System
+### 4. Face Recognition System with ENS Integration
 
 ```javascript
 class FaceRecognitionSystem {
@@ -240,29 +399,28 @@ class FaceRecognitionSystem {
     this.api = api;
   }
 
-  // Register user face
-  async registerUserFace(userId, imageFile) {
-    const identifier = `user_${userId}`;
-    const result = await this.api.registerFace(imageFile, identifier);
+  // Register user face with ENS domain
+  async registerUserFaceWithENS(ensDomain, imageFile, signature, message) {
+    const result = await this.api.registerFaceWithENS(imageFile, ensDomain, signature, message);
     
     if (result.success) {
-      console.log(`Face registered for user ${userId}`);
-      return { success: true, identifier };
+      console.log(`Face registered for ENS domain ${ensDomain}`);
+      return { success: true, ensDomain: result.ensDomain, ownerAddress: result.ownerAddress };
     } else {
       console.error('Face registration failed:', result.error);
       return { success: false, error: result.error };
     }
   }
 
-  // Authenticate with face
-  async authenticateWithFace(imageFile) {
+  // Authenticate with face and get ENS identity
+  async authenticateWithFaceAndENS(imageFile) {
     const result = await this.api.recognizeFace(imageFile);
     
     if (result.match && result.match.confidence > 0.8) {
-      const userId = result.match.identifier.replace('user_', '');
       return { 
         success: true, 
-        userId, 
+        ensDomain: result.match.ensDomain,
+        ownerAddress: result.match.ownerAddress,
         confidence: result.match.confidence 
       };
     } else {
@@ -273,21 +431,22 @@ class FaceRecognitionSystem {
     }
   }
 
-  // Check if user has registered face
-  async hasRegisteredFace(userId) {
-    const faces = await this.api.getRegisteredFaces();
-    const identifier = `user_${userId}`;
-    
-    return faces.faces.some(face => face.identifier === identifier);
+  // Check if ENS domain has registered face
+  async hasRegisteredFace(ensDomain) {
+    try {
+      const face = await this.api.getFaceByENS(ensDomain);
+      return face.success;
+    } catch (error) {
+      return false;
+    }
   }
 
-  // Delete user face
-  async deleteUserFace(userId) {
-    const identifier = `user_${userId}`;
-    const result = await this.api.deleteFace(identifier);
+  // Delete user face by ENS domain
+  async deleteUserFaceByENS(ensDomain) {
+    const result = await this.api.deleteFaceByENS(ensDomain);
     
     if (result.success) {
-      console.log(`Face deleted for user ${userId}`);
+      console.log(`Face deleted for ENS domain ${ensDomain}`);
       return { success: true };
     } else {
       console.error('Face deletion failed:', result.error);
@@ -299,23 +458,26 @@ class FaceRecognitionSystem {
 // Usage
 const faceSystem = new FaceRecognitionSystem(api);
 
-// Register user face
-const registerFace = async (userId, imageFile) => {
-  const result = await faceSystem.registerUserFace(userId, imageFile);
+// Register user face with ENS domain
+const registerFaceWithENS = async (ensDomain, imageFile, signature, message) => {
+  const result = await faceSystem.registerUserFaceWithENS(ensDomain, imageFile, signature, message);
   
   if (result.success) {
-    console.log('Face registered successfully');
+    console.log(`Face registered for ENS domain ${result.ensDomain}`);
+    console.log(`Owner address: ${result.ownerAddress}`);
   } else {
     console.error('Registration failed:', result.error);
   }
 };
 
-// Authenticate with face
-const authenticateWithFace = async (imageFile) => {
-  const result = await faceSystem.authenticateWithFace(imageFile);
+// Authenticate with face and get ENS identity
+const authenticateWithFaceAndENS = async (imageFile) => {
+  const result = await faceSystem.authenticateWithFaceAndENS(imageFile);
   
   if (result.success) {
-    console.log(`User ${result.userId} authenticated with confidence ${result.confidence}`);
+    console.log(`User authenticated with ENS domain: ${result.ensDomain}`);
+    console.log(`Owner address: ${result.ownerAddress}`);
+    console.log(`Confidence: ${result.confidence}`);
   } else {
     console.error('Authentication failed:', result.error);
   }
