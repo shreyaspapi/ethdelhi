@@ -9,7 +9,7 @@ const fs = require('fs');
 // Canvas dependency removed - using simplified face detection
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
@@ -68,7 +68,7 @@ app.post('/verify-signature', async (req, res) => {
 
     // Verify the signature
     const recoveredAddress = ethers.verifyMessage(message, signature);
-    
+
     // Check if the recovered address matches the provided address
     const isValid = recoveredAddress.toLowerCase() === address.toLowerCase();
 
@@ -105,7 +105,7 @@ app.get('/ens-lookup/:address', async (req, res) => {
 
     // Look up ENS name
     const ensName = await provider.lookupAddress(address);
-    
+
     res.json({
       address,
       ensName: ensName || null,
@@ -131,7 +131,7 @@ app.get('/reverse-ens/:ensName', async (req, res) => {
 
     // Resolve ENS name to address
     const address = await provider.resolveName(ensName);
-    
+
     if (!address) {
       return res.status(404).json({
         error: 'ENS name not found or not resolvable'
@@ -168,7 +168,7 @@ app.post('/upload-image', upload.single('image'), async (req, res) => {
 
     const { bucket = 'default-images' } = req.body;
     const file = req.file;
-    
+
     // Generate unique filename
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 15);
@@ -177,9 +177,9 @@ app.post('/upload-image', upload.single('image'), async (req, res) => {
 
     // Process image with Sharp (resize and optimize)
     const processedImageBuffer = await sharp(file.buffer)
-      .resize(1920, 1080, { 
+      .resize(1920, 1080, {
         fit: 'inside',
-        withoutEnlargement: true 
+        withoutEnlargement: true
       })
       .jpeg({ quality: 85 })
       .toBuffer();
@@ -233,12 +233,12 @@ app.post('/detect-faces', upload.single('image'), async (req, res) => {
     }
 
     const file = req.file;
-    
+
     // Process image with Sharp to ensure compatibility
     const processedBuffer = await sharp(file.buffer)
-      .resize(800, 600, { 
+      .resize(800, 600, {
         fit: 'inside',
-        withoutEnlargement: true 
+        withoutEnlargement: true
       })
       .jpeg({ quality: 90 })
       .toBuffer();
@@ -251,7 +251,7 @@ app.post('/detect-faces', upload.single('image'), async (req, res) => {
       // Simple face detection using basic image analysis
       // In a production environment, you would use a proper face detection library
       const faceCount = await detectFacesBasic(processedBuffer);
-      
+
       // Clean up temp file
       fs.unlinkSync(tempPath);
 
@@ -296,7 +296,7 @@ app.post('/register-face', upload.single('image'), async (req, res) => {
     }
 
     const { identifier } = req.body;
-    
+
     if (!identifier) {
       return res.status(400).json({
         error: 'Identifier is required'
@@ -311,10 +311,10 @@ app.post('/register-face', upload.single('image'), async (req, res) => {
     }
 
     const file = req.file;
-    
+
     // Process image
     const processedBuffer = await sharp(file.buffer)
-      .resize(400, 400, { 
+      .resize(400, 400, {
         fit: 'cover'
       })
       .jpeg({ quality: 85 })
@@ -322,7 +322,7 @@ app.post('/register-face', upload.single('image'), async (req, res) => {
 
     // Create face descriptor (simplified - in production use proper face recognition)
     const faceDescriptor = await generateFaceDescriptor(processedBuffer);
-    
+
     // Store face data
     const faceData = {
       identifier: identifier,
@@ -370,10 +370,10 @@ app.post('/recognize-face', upload.single('image'), async (req, res) => {
     }
 
     const file = req.file;
-    
+
     // Process image
     const processedBuffer = await sharp(file.buffer)
-      .resize(400, 400, { 
+      .resize(400, 400, {
         fit: 'cover'
       })
       .jpeg({ quality: 85 })
@@ -381,10 +381,10 @@ app.post('/recognize-face', upload.single('image'), async (req, res) => {
 
     // Generate face descriptor
     const faceDescriptor = await generateFaceDescriptor(processedBuffer);
-    
+
     // Find best match
     const match = findBestMatch(faceDescriptor);
-    
+
     if (match) {
       res.json({
         success: true,
@@ -443,9 +443,9 @@ app.get('/registered-faces', (req, res) => {
 app.delete('/registered-faces/:identifier', (req, res) => {
   try {
     const { identifier } = req.params;
-    
+
     const faceIndex = registeredFaces.findIndex(face => face.identifier === identifier);
-    
+
     if (faceIndex === -1) {
       return res.status(404).json({
         error: 'Face not found'
@@ -493,7 +493,7 @@ function findBestMatch(descriptor) {
   for (const face of registeredFaces) {
     // Simplified matching - in production, use proper face recognition algorithms
     const similarity = calculateSimilarity(descriptor, face.descriptor);
-    
+
     if (similarity > threshold && similarity > bestScore) {
       bestScore = similarity;
       bestMatch = {
@@ -525,8 +525,8 @@ function updateFaceMatcher() {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     timestamp: new Date().toISOString(),
     registeredFaces: registeredFaces.length
   });
