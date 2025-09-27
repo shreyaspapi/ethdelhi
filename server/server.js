@@ -16,7 +16,7 @@ app.use(cors());
 app.use(express.json());
 
 // Provider for Sepolia testnet
-const provider = new ethers.JsonRpcProvider('https://api.zan.top/eth-sepolia');
+const provider = new ethers.JsonRpcProvider('https://1rpc.io/sepolia');
 
 // ENS Sepolia Contract Addresses
 const ENS_CONTRACTS = {
@@ -614,15 +614,15 @@ app.get('/registered-faces', (req, res) => {
 app.get('/face-by-ens/:ensDomain', (req, res) => {
   try {
     const { ensDomain } = req.params;
-    
+
     const face = registeredFaces.find(f => f.ensDomain === ensDomain);
-    
+
     if (!face) {
       return res.status(404).json({
         error: 'Face not found for ENS domain'
       });
     }
-    
+
     res.json({
       success: true,
       face: {
@@ -632,7 +632,7 @@ app.get('/face-by-ens/:ensDomain', (req, res) => {
         imageSize: face.imageSize
       }
     });
-    
+
   } catch (error) {
     console.error('Get face by ENS error:', error);
     res.status(500).json({
@@ -685,27 +685,27 @@ async function verifyENSOwnership(ensDomain, signature, message) {
   try {
     // Verify the signature
     const recoveredAddress = ethers.verifyMessage(message, signature);
-    
+
     // Resolve ENS domain to address
     const domainAddress = await resolveAddress(ensDomain);
-    
+
     if (!domainAddress) {
       return {
         isValid: false,
         error: 'ENS domain not found or not resolvable'
       };
     }
-    
+
     // Check if the recovered address matches the ENS domain address
     const isOwner = recoveredAddress.toLowerCase() === domainAddress.toLowerCase();
-    
+
     return {
       isValid: isOwner,
       address: recoveredAddress,
       domainAddress: domainAddress,
       error: isOwner ? null : 'Signature does not match ENS domain owner'
     };
-    
+
   } catch (error) {
     console.error('ENS ownership verification error:', error);
     return {
@@ -721,12 +721,12 @@ async function verifyENSOwnership(ensDomain, signature, message) {
 function getNamehash(name) {
   const labels = name.split('.').reverse();
   let node = '0x0000000000000000000000000000000000000000000000000000000000000000';
-  
+
   for (const label of labels) {
     const labelHash = ethers.keccak256(ethers.toUtf8Bytes(label));
     node = ethers.keccak256(ethers.concat([node, labelHash]));
   }
-  
+
   return node;
 }
 
@@ -746,11 +746,11 @@ async function resolveAddress(name) {
   try {
     const namehash = getNamehash(name);
     const resolverAddress = await getResolver(name);
-    
+
     if (resolverAddress === '0x0000000000000000000000000000000000000000') {
       return null;
     }
-    
+
     const resolver = new ethers.Contract(resolverAddress, PUBLIC_RESOLVER_ABI, provider);
     return await resolver.addr(namehash);
   } catch (error) {
@@ -766,11 +766,11 @@ async function getTextRecord(name, key) {
   try {
     const namehash = getNamehash(name);
     const resolverAddress = await getResolver(name);
-    
+
     if (resolverAddress === '0x0000000000000000000000000000000000000000') {
       return null;
     }
-    
+
     const resolver = new ethers.Contract(resolverAddress, PUBLIC_RESOLVER_ABI, provider);
     return await resolver.text(namehash, key);
   } catch (error) {
@@ -786,11 +786,11 @@ async function getContentHash(name) {
   try {
     const namehash = getNamehash(name);
     const resolverAddress = await getResolver(name);
-    
+
     if (resolverAddress === '0x0000000000000000000000000000000000000000') {
       return null;
     }
-    
+
     const resolver = new ethers.Contract(resolverAddress, PUBLIC_RESOLVER_ABI, provider);
     return await resolver.contenthash(namehash);
   } catch (error) {
