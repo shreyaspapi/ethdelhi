@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAccount, useSignMessage } from 'wagmi';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -71,6 +71,8 @@ export default function RegisterPage() {
           facingMode: 'user',
         },
       });
+      console.log('Camera stream obtained:', mediaStream);
+      console.log('Stream tracks:', mediaStream.getTracks());
       setStream(mediaStream);
       setCameraPermission(true);
     } catch (error) {
@@ -78,6 +80,18 @@ export default function RegisterPage() {
       setCameraPermission(false);
     }
   };
+
+  const stopCameraStream = useCallback(() => {
+    if (stream) {
+      console.log('Stopping camera stream');
+      stream.getTracks().forEach((track) => {
+        track.stop();
+        console.log('Stopped track:', track.kind);
+      });
+      setStream(null);
+      setCameraPermission(null);
+    }
+  }, [stream]);
 
   const capturePhoto = () => {
     if (!videoRef.current || !canvasRef.current) return;
@@ -99,14 +113,19 @@ export default function RegisterPage() {
     const imageData = canvas.toDataURL('image/jpeg', 0.8);
     setCapturedImage(imageData);
     setIsCapturing(false);
+
+    // Stop the camera stream after capturing the photo
+    stopCameraStream();
   };
 
   const retakePhoto = () => {
     setCapturedImage(null);
+    // Restart camera for retaking photo
+    requestCameraPermission();
   };
 
   const proceedToSignature = () => {
-    setCurrentSlide(5);
+    setCurrentSlide(2);
   };
 
   const registerFace = async () => {
@@ -163,9 +182,14 @@ export default function RegisterPage() {
   };
 
   const nextSlide = () => {
-    // Prevent navigation from camera permission slide if permission is not granted
+    // Prevent navigation from camera step if permission is not granted
     if (currentSlide === 1 && cameraPermission !== true) {
       return;
+    }
+
+    // Stop camera stream when leaving the camera step
+    if (currentSlide === 1 && stream) {
+      stopCameraStream();
     }
 
     if (currentSlide < onboardingSlides.length - 1) {
@@ -174,6 +198,11 @@ export default function RegisterPage() {
   };
 
   const prevSlide = () => {
+    // Stop camera stream when leaving the camera step
+    if (currentSlide === 1 && stream) {
+      stopCameraStream();
+    }
+
     if (currentSlide > 0) {
       setCurrentSlide(currentSlide - 1);
     }
@@ -212,133 +241,10 @@ export default function RegisterPage() {
     },
     {
       id: 1,
-      title: 'Camera Permission',
-      description: 'We need access to your camera to take your photo',
-      content: (
-        <div className="space-y-4 text-center">
-          <div className="text-6xl mb-4">📷</div>
-          <div className="space-y-2">
-            <p>To register your face, we need to access your camera.</p>
-            <p className="text-sm text-muted-foreground">
-              Your photo will only be used for face recognition and will be
-              securely stored.
-            </p>
-            <div className="space-y-4">
-              {cameraPermission === true && (
-                <div className="flex items-center justify-center gap-2 text-green-600">
-                  <Check className="w-4 h-4" />
-                  Camera permission granted!
-                </div>
-              )}
-              {cameraPermission === false && (
-                <Button
-                  onClick={requestCameraPermission}
-                  className="w-full max-w-md"
-                  variant={'outline'}
-                >
-                  Retry Camera Permission
-                </Button>
-              )}
-
-              {cameraPermission === null && (
-                <Button
-                  onClick={requestCameraPermission}
-                  className="w-full max-w-md"
-                  variant={'default'}
-                >
-                  Grant Camera Permission
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: 2,
-      title: 'Camera Quality Check',
-      description: "Let's make sure your camera is working properly",
-      content: (
-        <div className="space-y-4">
-          <div className="text-center">
-            <div className="text-6xl mb-4">🔍</div>
-            <p>We&apos;ll check if your camera feed is clear and well-lit.</p>
-          </div>
-          {stream && (
-            <div className="relative">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full max-w-md mx-auto rounded-lg"
-                style={{ transform: 'scaleX(-1)' }}
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-48 h-48 border-2 border-white rounded-full opacity-50"></div>
-              </div>
-            </div>
-          )}
-          {!stream && cameraPermission && (
-            <div className="text-center">
-              <p className="text-muted-foreground">Starting camera...</p>
-            </div>
-          )}
-        </div>
-      ),
-    },
-    {
-      id: 3,
-      title: 'Face Alignment',
-      description: 'Position your face within the outline for the best photo',
-      content: (
-        <div className="space-y-4">
-          <div className="text-center">
-            <div className="text-6xl mb-4">👤</div>
-            <p>
-              Align your face with the outline. The border will turn green when
-              you&apos;re positioned correctly.
-            </p>
-          </div>
-          {stream && (
-            <div className="relative">
-              <video
-                ref={videoRef}
-                autoPlay
-                playsInline
-                muted
-                className="w-full max-w-md mx-auto rounded-lg"
-                style={{ transform: 'scaleX(-1)' }}
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div
-                  className={`w-48 h-48 border-4 rounded-full transition-colors duration-300 ${
-                    isFaceAligned ? 'border-green-500' : 'border-white'
-                  } opacity-70`}
-                ></div>
-              </div>
-            </div>
-          )}
-          <div className="text-center">
-            <p
-              className={`text-sm ${
-                isFaceAligned ? 'text-green-600' : 'text-orange-600'
-              }`}
-            >
-              {isFaceAligned
-                ? '✅ Perfect! Your face is well-aligned'
-                : '⏳ Please align your face with the outline'}
-            </p>
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: 4,
-      title: 'Capture Photo',
+      title: 'Take Your Photo',
       description: capturedImage
         ? 'Review your photo'
-        : 'Take your registration photo',
+        : 'Grant camera permission and capture your registration photo',
       content: (
         <div className="space-y-4">
           {!capturedImage ? (
@@ -346,39 +252,96 @@ export default function RegisterPage() {
               <div className="text-center">
                 <div className="text-6xl mb-4">📸</div>
                 <p>
-                  When you&apos;re ready, click the capture button to take your
+                  We need access to your camera to register your face. Align
+                  your face with the outline below. The border will turn green
+                  when you&apos;re positioned correctly, then capture your
                   photo.
                 </p>
               </div>
-              {stream && (
-                <div className="relative">
-                  <video
-                    ref={videoRef}
-                    autoPlay
-                    playsInline
-                    muted
-                    className="w-full max-w-md mx-auto rounded-lg"
-                    style={{ transform: 'scaleX(-1)' }}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div
-                      className={`w-48 h-48 border-4 rounded-full transition-colors duration-300 ${
-                        isFaceAligned ? 'border-green-500' : 'border-white'
-                      } opacity-70`}
-                    ></div>
-                  </div>
+
+              {/* Camera permission section */}
+              {cameraPermission !== true && (
+                <div className="text-center space-y-4">
+                  {cameraPermission === false && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-center gap-2 text-red-600">
+                        <X className="w-4 h-4" />
+                        Camera permission denied. Please enable it in your
+                        browser settings.
+                      </div>
+                      <Button
+                        onClick={requestCameraPermission}
+                        className="w-full max-w-md"
+                        variant={'outline'}
+                      >
+                        Retry Camera Permission
+                      </Button>
+                    </div>
+                  )}
+
+                  {cameraPermission === null && (
+                    <Button
+                      onClick={requestCameraPermission}
+                      className="w-full max-w-md"
+                      variant={'default'}
+                    >
+                      Grant Camera Permission
+                    </Button>
+                  )}
                 </div>
               )}
-              <div className="text-center">
-                <Button
-                  onClick={capturePhoto}
-                  disabled={!isFaceAligned || isCapturing}
-                  className="w-full max-w-md"
-                >
-                  <Camera className="w-4 h-4 mr-2" />
-                  {isCapturing ? 'Capturing...' : 'Capture Photo'}
-                </Button>
-              </div>
+
+              {/* Camera feed and capture section */}
+              {cameraPermission === true && (
+                <>
+                  <div className="relative w-full max-w-md mx-auto">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="w-full rounded-lg bg-black"
+                      style={{ transform: 'scaleX(-1)' }}
+                    />
+
+                    {/* Face alignment indicator around the video */}
+                    <div
+                      className={`absolute inset-0 border-4 rounded-lg transition-all duration-300 pointer-events-none ${
+                        isFaceAligned
+                          ? 'border-green-500 shadow-lg shadow-green-500/50'
+                          : 'border-white/50'
+                      }`}
+                    />
+
+                    {!stream && cameraPermission && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50 rounded-lg">
+                        <p className="text-white">Starting camera...</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="text-center space-y-3">
+                    <p
+                      className={`text-sm ${
+                        isFaceAligned ? 'text-green-600' : 'text-orange-600'
+                      }`}
+                    >
+                      {isFaceAligned
+                        ? '✅ Perfect! Your face is well-aligned'
+                        : '⏳ Please align your face with the outline'}
+                    </p>
+
+                    <Button
+                      onClick={capturePhoto}
+                      disabled={!isFaceAligned || isCapturing}
+                      className="w-full max-w-md"
+                    >
+                      <Camera className="w-4 h-4 mr-2" />
+                      {isCapturing ? 'Capturing...' : 'Capture Photo'}
+                    </Button>
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <>
@@ -414,7 +377,7 @@ export default function RegisterPage() {
       ),
     },
     {
-      id: 5,
+      id: 2,
       title: 'Final Step',
       description: 'Sign a message to verify your ENS domain ownership',
       content: (
@@ -462,17 +425,93 @@ export default function RegisterPage() {
     },
   ];
 
+  // Connect stream to video element
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      console.log('Connecting stream to video element');
+      console.log('Video element:', videoRef.current);
+      console.log('Stream:', stream);
+      console.log('Stream tracks:', stream.getTracks());
+
+      const video = videoRef.current;
+
+      // Set the stream source
+      video.srcObject = stream;
+
+      // Force load the video
+      video.load();
+
+      const handleLoadedMetadata = () => {
+        console.log('Video metadata loaded');
+        console.log(
+          'Video dimensions:',
+          video.videoWidth,
+          'x',
+          video.videoHeight
+        );
+        console.log('Video ready state:', video.readyState);
+      };
+
+      const handleCanPlay = () => {
+        console.log('Video can play');
+        // Force play when ready
+        video.play().catch((error) => {
+          console.error('Failed to play video:', error);
+        });
+      };
+
+      const handlePlay = () => {
+        console.log('Video started playing');
+      };
+
+      const handleError = (e: Event) => {
+        console.error('Video error:', e);
+      };
+
+      const handleLoadedData = () => {
+        console.log('Video data loaded');
+      };
+
+      video.addEventListener('loadedmetadata', handleLoadedMetadata);
+      video.addEventListener('loadeddata', handleLoadedData);
+      video.addEventListener('canplay', handleCanPlay);
+      video.addEventListener('play', handlePlay);
+      video.addEventListener('error', handleError);
+
+      // Try to play immediately
+      video.play().catch((error) => {
+        console.error('Failed to play video immediately:', error);
+      });
+
+      // Cleanup event listeners
+      return () => {
+        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        video.removeEventListener('loadeddata', handleLoadedData);
+        video.removeEventListener('canplay', handleCanPlay);
+        video.removeEventListener('play', handlePlay);
+        video.removeEventListener('error', handleError);
+      };
+    }
+  }, [stream]);
+
   // Simulate face alignment detection
   useEffect(() => {
-    if (stream && currentSlide === 3) {
+    if (stream && currentSlide === 1) {
       const interval = setInterval(() => {
         // This is a simplified check - in a real app you'd use face detection
-        setIsFaceAligned(Math.random() > 0.5);
-      }, 1000);
+        setIsFaceAligned(true);
+      }, 2000);
 
       return () => clearInterval(interval);
     }
   }, [stream, currentSlide]);
+
+  // Cleanup stream on unmount
+  useEffect(() => {
+    return () => {
+      stopCameraStream();
+    };
+  }, [stream, stopCameraStream]);
 
   if (!isConnected) {
     return <div>Please connect your wallet first.</div>;
