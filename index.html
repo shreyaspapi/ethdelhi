@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Recognition App</title>
+    <link rel="stylesheet" href="style.css">
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script defer src="app.js"></script>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="loading-screen">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <h2>Loading Face Recognition Models</h2>
+                <p id="loading-status">Initializing...</p>
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main App -->
+        <div id="main-app" class="main-app hidden">
+            <!-- Guard Gateway Section -->
+            <div class="card guard-section">
+                <div class="card__header">
+                    <h2>🛡️ Guard Gateway Interface</h2>
+                </div>
+                <div class="card__body">
+                    <div class="video-container">
+                        <video id="guard-video" autoplay muted playsinline></video>
+                        <canvas id="guard-canvas"></canvas>
+                    </div>
+                    <div class="guard-controls">
+                        <button id="start-camera-btn" class="btn btn--primary">Start Camera</button>
+                        <button id="stop-camera-btn" class="btn btn--danger" disabled>Stop Camera</button>
+                    </div>
+                    <div id="guard-result" class="result-area"></div>
+                </div>
+            </div>
+
+            <!-- Threshold Control -->
+            <div class="card threshold-control">
+                <div class="card__body">
+                    <label class="form-label" for="threshold">Face Matching Threshold: <span id="threshold-value">0.6</span></label>
+                    <input type="range" id="threshold" min="0.3" max="0.9" step="0.05" value="0.6" class="threshold-slider">
+                    <small>Lower values = more strict matching</small>
+                </div>
+            </div>
+
+            <div class="app-grid">
+                <!-- Register Face Section -->
+                <div class="card register-section">
+                    <div class="card__header">
+                        <h2>Register New Face</h2>
+                    </div>
+                    <div class="card__body">
+                        <div class="upload-area" id="register-upload">
+                            <div class="upload-content">
+                                <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                    <polyline points="7,10 12,15 17,10"></polyline>
+                                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                                </svg>
+                                <p>Drop image here or click to upload</p>
+                                <small>JPEG, PNG, GIF, WebP - Max 5MB</small>
+                            </div>
+                            <input type="file" id="register-file" accept="image/*" hidden>
+                        </div>
+                        
+                        <div id="register-preview" class="image-preview hidden">
+                            <img id="register-img" alt="Preview">
+                            <canvas id="register-canvas"></canvas>
+                        </div>
+                        
+                        <div id="register-form" class="register-form hidden">
+                            <div class="form-group">
+                                <label class="form-label" for="face-identifier">Identifier (Name/ID):</label>
+                                <input type="text" id="face-identifier" class="form-control" placeholder="Enter name or identifier">
+                            </div>
+                            <button id="register-btn" class="btn btn--primary btn--full-width">Register Face</button>
+                        </div>
+                        
+                        <div id="register-result" class="result-area"></div>
+                    </div>
+                </div>
+
+                <!-- Recognize Face Section removed per requirements -->
+            </div>
+
+            <!-- Registered Faces -->
+            <div class="card registered-faces">
+                <div class="card__header">
+                    <h3>Registered Faces (<span id="face-count">0</span>)</h3>
+                </div>
+                <div class="card__body">
+                    <div id="faces-list" class="faces-list">
+                        <div class="empty-state">
+                            <p>No faces registered yet. Upload an image above to get started.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
