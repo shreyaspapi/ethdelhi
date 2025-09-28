@@ -443,8 +443,8 @@ export default function RegisterPage() {
           <div className="text-center">
             <div className="text-6xl mb-4">✍️</div>
             <p>
-              Sign a message to verify your ENS domain ownership. This signature will be used to complete your
-              registration.
+              Sign a message to verify your ENS domain ownership. This signature
+              will be used to complete your registration.
             </p>
           </div>
 
@@ -462,10 +462,7 @@ export default function RegisterPage() {
               <div className="space-y-2">
                 <Button
                   onClick={handleSignMessage}
-                  disabled={
-                    isSigning ||
-                    !ensData?.ensName
-                  }
+                  disabled={isSigning || !ensData?.ensName}
                   className="w-full"
                 >
                   {isSigning ? 'Signing Message...' : 'Sign Message'}
@@ -593,8 +590,8 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl">
+    <div className="min-h-screen bg-background flex justify-center p-4">
+      <Card className="w-full max-w-2xl h-min">
         <CardHeader>
           <CardTitle className="text-center">
             {onboardingSlides[currentSlide].title}

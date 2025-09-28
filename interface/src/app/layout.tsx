@@ -42,7 +42,7 @@ export default async function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <header className="w-full flex justify-end">
+            <header className="w-full flex justify-end py-6 px-10">
               <div className="flex items-center gap-4">
                 <ConnectButton />
                 <ThemeToggle />
