@@ -8,6 +8,10 @@ class FaceRecognitionApp {
         this.isDetecting = false;
         this.currentRecognizedUser = null;
         this.detectionInterval = null;
+        this.isRecognizingAPI = false;
+        this.apiBaseUrl = 'http://localhost:3001';
+        this.apiCooldownMs = 3000;
+        this.lastAPICallAt = 0;
 
         this.init();
     }
@@ -475,47 +479,126 @@ class FaceRecognitionApp {
             if (detections.length === 0) {
                 this.showGuardResult('info', 'Looking for faces... Position yourself in front of the camera.');
                 this.currentRecognizedUser = null;
+                this.isRecognizingAPI = false;
                 return;
             }
 
             if (detections.length > 1) {
                 this.showGuardResult('warning', 'Multiple faces detected. Please ensure only one person is in the frame.');
                 this.currentRecognizedUser = null;
+                this.isRecognizingAPI = false;
                 return;
             }
 
             // Draw face detection
             this.drawFaceDetection(video, canvas, detections);
 
-            if (this.registeredFaces.length === 0) {
-                this.showGuardResult('error', 'No registered faces in the database. Please register faces first.');
-                return;
-            }
-
-            if (!this.faceMatcher) {
-                this.updateFaceMatcher();
-            }
-
-            const match = this.faceMatcher.findBestMatch(detections[0].descriptor);
-
-            if (match.label === 'unknown') {
-                this.showGuardResult('error', 'Unknown person detected. Access denied.');
-                this.currentRecognizedUser = null;
-            } else {
-                const confidence = (1 - match.distance) * 100;
-                const recognizedFace = this.registeredFaces.find(face => face.identifier === match.label);
-
-                // Only show recognition result if it's a different user or confidence is high enough
-                if (!this.currentRecognizedUser || this.currentRecognizedUser.identifier !== recognizedFace.identifier) {
-                    this.currentRecognizedUser = recognizedFace;
-                    this.showRecognitionResult(recognizedFace, confidence);
-                }
+            // Call backend recognition API with cooldown to avoid spamming
+            const now = Date.now();
+            if (!this.isRecognizingAPI && now - this.lastAPICallAt > this.apiCooldownMs) {
+                this.isRecognizingAPI = true;
+                await this.recognizeFaceViaAPIFromVideo(video);
+                this.lastAPICallAt = Date.now();
+                this.isRecognizingAPI = false;
             }
 
         } catch (error) {
             console.error('Error in continuous detection:', error);
         } finally {
             this.isDetecting = false;
+        }
+    }
+
+    async recognizeFaceViaAPIFromVideo(video) {
+        try {
+            // Capture current frame to a blob
+            const frameBlob = await this.captureCurrentFrameAsBlob(video);
+            if (!frameBlob) {
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('image', frameBlob, 'frame.jpg');
+
+            const response = await fetch(`${this.apiBaseUrl}/recognize-face`, {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            this.showServerRecognitionResult(result);
+
+        } catch (error) {
+            console.error('Recognition API error:', error);
+            this.showGuardResult('error', 'Failed to contact recognition service.');
+        }
+    }
+
+    async captureCurrentFrameAsBlob(video) {
+        return new Promise((resolve) => {
+            try {
+                const offscreen = document.createElement('canvas');
+                offscreen.width = video.videoWidth || 640;
+                offscreen.height = video.videoHeight || 480;
+                const ctx = offscreen.getContext('2d');
+                // Mirror to match user-facing camera preview
+                ctx.save();
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, -offscreen.width, 0, offscreen.width, offscreen.height);
+                ctx.restore();
+                offscreen.toBlob((blob) => resolve(blob), 'image/jpeg', 0.85);
+            } catch (e) {
+                console.error('Failed to capture frame:', e);
+                resolve(null);
+            }
+        });
+    }
+
+    showServerRecognitionResult(apiResult) {
+        if (!apiResult || apiResult.error) {
+            this.showGuardResult('error', apiResult?.error || 'Recognition failed.');
+            this.currentRecognizedUser = null;
+            return;
+        }
+
+        if (apiResult.match) {
+            const confidencePct = Number.isFinite(apiResult.match.confidence)
+                ? (apiResult.match.confidence * 100).toFixed(1)
+                : '—';
+
+            const resultHtml = `
+                <div class="recognition-result">
+                    <h4>✅ Person Recognized</h4>
+                    <div class="user-info">
+                        <div class="user-details">
+                            <h5>${apiResult.match.ensDomain}</h5>
+                            <p>Owner: ${apiResult.match.ownerAddress}</p>
+                            <span class="confidence-badge">${confidencePct}% confidence</span>
+                        </div>
+                    </div>
+                    <button id="send-request-btn" class="btn btn--primary send-request-btn">📱 Send Transaction Request</button>
+                </div>
+            `;
+
+            const guardResult = document.getElementById('guard-result');
+            guardResult.innerHTML = resultHtml;
+
+            const btn = document.getElementById('send-request-btn');
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    // Reuse existing transaction popup flow without thumbnail/identifier
+                    const user = {
+                        identifier: apiResult.match.ensDomain,
+                        thumbnail: '',
+                        registeredAt: apiResult.match.registeredAt || new Date().toISOString()
+                    };
+                    this.sendTransactionRequest(user);
+                });
+            }
+
+        } else {
+            this.showGuardResult('error', 'Unknown person detected. Access denied.');
+            this.currentRecognizedUser = null;
         }
     }
 
