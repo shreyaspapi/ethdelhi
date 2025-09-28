@@ -40,8 +40,9 @@ export default function Home() {
 
   // Check face data when ENS data is available
   useEffect(() => {
-    if (ensData && ensData.name && typeof ensData.name === 'string') {
-      checkFaceData(ensData.name);
+    console.log("ensData : ", ensData);
+    if (ensData && ensData.ensName && typeof ensData.ensName === 'string') {
+      checkFaceData(ensData.ensName);
     } else {
       setFaceData(null);
       setFaceError(null);
@@ -75,6 +76,7 @@ export default function Home() {
     setFaceLoading(true);
     setFaceError(null);
 
+    console.log("checking face data")
     try {
       const response = await fetch(
         `${API_BASE_URL}${FACE_BY_ENS_ENDPOINT}/${ensDomain}`
@@ -89,7 +91,7 @@ export default function Home() {
         }
       } else {
         const data = await response.json();
-        setFaceData(data);
+        setFaceData(data.face);
       }
     } catch (err) {
       console.error('Failed to check face data:', err);
@@ -203,6 +205,26 @@ export default function Home() {
             )}
           </div>
         )}
+
+        {/* Navigation buttons */}
+        <div className="w-full max-w-2xl space-y-4">
+          <div className="flex gap-4 justify-center">
+            <Button
+              onClick={() => router.push('/recognize')}
+              variant="outline"
+              className="flex-1"
+            >
+              🔍 Recognize Face
+            </Button>
+            <Button
+              onClick={() => router.push('/register')}
+              variant="outline"
+              className="flex-1"
+            >
+              📸 Register Face
+            </Button>
+          </div>
+        </div>
 
         {/* <ActionButtonList /> */}
         {/* <InfoList /> */}

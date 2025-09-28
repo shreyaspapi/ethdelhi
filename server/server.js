@@ -6,7 +6,12 @@ const multer = require('multer');
 const sharp = require('sharp');
 const path = require('path');
 const fs = require('fs');
-// Canvas dependency removed - using simplified face detection
+const faceapi = require('face-api.js');
+const { Canvas, Image, ImageData, loadImage } = require('canvas');
+const { fileURLToPath } = require('url');
+
+// Configure face-api.js to use canvas
+faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -16,7 +21,7 @@ app.use(cors());
 app.use(express.json());
 
 // Provider for Sepolia testnet
-const provider = new ethers.JsonRpcProvider('https://1rpc.io/sepolia');
+const provider = new ethers.JsonRpcProvider('https://0xrpc.io/sep');
 
 // ENS Sepolia Contract Addresses
 const ENS_CONTRACTS = {
@@ -74,6 +79,29 @@ const upload = multer({
 // Face recognition storage (in production, use a database)
 let registeredFaces = [];
 let faceMatcher = null;
+let modelsLoaded = false;
+
+// Initialize face-api.js models
+async function loadFaceApiModels() {
+  try {
+    const modelsPath = path.join(__dirname, 'models');
+    
+    await Promise.all([
+      faceapi.nets.tinyFaceDetector.loadFromDisk(modelsPath),
+      faceapi.nets.faceLandmark68Net.loadFromDisk(modelsPath),
+      faceapi.nets.faceRecognitionNet.loadFromDisk(modelsPath)
+    ]);
+    
+    modelsLoaded = true;
+    console.log('Face-api.js models loaded successfully');
+  } catch (error) {
+    console.error('Error loading face-api.js models:', error);
+    modelsLoaded = false;
+  }
+}
+
+// Load models on startup
+loadFaceApiModels();
 
 /**
  * Verify Ethereum signature
@@ -404,8 +432,14 @@ app.post('/detect-faces', upload.single('image'), async (req, res) => {
     fs.writeFileSync(tempPath, processedBuffer);
 
     try {
-      // Simple face detection using basic image analysis
-      // In a production environment, you would use a proper face detection library
+      // Check if models are loaded
+      if (!modelsLoaded) {
+        return res.status(503).json({
+          error: 'Face recognition models are still loading. Please try again in a few seconds.'
+        });
+      }
+
+      // Face detection using face-api.js
       const faceCount = await detectFacesBasic(processedBuffer);
 
       // Clean up temp file
@@ -485,7 +519,14 @@ app.post('/register-face', upload.single('image'), async (req, res) => {
       .jpeg({ quality: 85 })
       .toBuffer();
 
-    // Create face descriptor (simplified - in production use proper face recognition)
+    // Check if models are loaded
+    if (!modelsLoaded) {
+      return res.status(503).json({
+        error: 'Face recognition models are still loading. Please try again in a few seconds.'
+      });
+    }
+
+    // Create face descriptor using face-api.js
     const faceDescriptor = await generateFaceDescriptor(processedBuffer);
 
     // Store face data with ENS domain
@@ -498,6 +539,8 @@ app.post('/register-face', upload.single('image'), async (req, res) => {
       message: message,
       signature: signature
     };
+
+    console.log("faceData : ", faceData);
 
     registeredFaces.push(faceData);
     updateFaceMatcher();
@@ -548,7 +591,14 @@ app.post('/recognize-face', upload.single('image'), async (req, res) => {
       .jpeg({ quality: 85 })
       .toBuffer();
 
-    // Generate face descriptor
+    // Check if models are loaded
+    if (!modelsLoaded) {
+      return res.status(503).json({
+        error: 'Face recognition models are still loading. Please try again in a few seconds.'
+      });
+    }
+
+    // Generate face descriptor using face-api.js
     const faceDescriptor = await generateFaceDescriptor(processedBuffer);
 
     // Find best match
@@ -646,31 +696,27 @@ app.get('/face-by-ens/:ensDomain', (req, res) => {
  * Delete a registered face by ENS domain
  * DELETE /registered-faces/:ensDomain
  */
-app.delete('/registered-faces/:ensDomain', (req, res) => {
+app.get('/registered-faces/:ensDomain', (req, res) => {
   try {
     const { ensDomain } = req.params;
 
-    const faceIndex = registeredFaces.findIndex(face => face.ensDomain === ensDomain);
+    const face = registeredFaces.find(face => face.ensDomain === ensDomain);
 
-    if (faceIndex === -1) {
+    if (!face) {
       return res.status(404).json({
         error: 'Face not found for ENS domain'
       });
     }
 
-    registeredFaces.splice(faceIndex, 1);
-    updateFaceMatcher();
-
     res.json({
       success: true,
-      message: 'Face deleted successfully',
-      totalCount: registeredFaces.length
+      face: face
     });
 
   } catch (error) {
-    console.error('Delete face error:', error);
+    console.error('Get face error:', error);
     res.status(500).json({
-      error: 'Failed to delete face',
+      error: 'Failed to get face',
       details: error.message
     });
   }
@@ -802,33 +848,82 @@ async function getContentHash(name) {
 // Helper functions for face recognition
 
 async function detectFacesBasic(imageBuffer) {
-  // Simplified face detection - in production, use a proper face detection library
-  // This is a placeholder that returns a random number of faces
-  return Math.floor(Math.random() * 3) + 1;
+  if (!modelsLoaded) {
+    throw new Error('Face-api.js models not loaded yet');
+  }
+
+  try {
+    // Create a temporary file for face-api.js
+    const tempPath = `/tmp/face_${Date.now()}.jpg`;
+    fs.writeFileSync(tempPath, imageBuffer);
+    
+    // Load image and detect faces
+    const img = await loadImage(tempPath);
+    const detections = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions());
+    
+    // Clean up temp file
+    if (fs.existsSync(tempPath)) {
+      fs.unlinkSync(tempPath);
+    }
+    
+    return detections.length;
+  } catch (error) {
+    console.error('Face detection error:', error);
+    throw new Error('Failed to detect faces: ' + error.message);
+  }
 }
 
 async function generateFaceDescriptor(imageBuffer) {
-  // Simplified face descriptor generation
-  // In production, use a proper face recognition library like face-api.js or OpenCV
-  const hash = require('crypto').createHash('md5').update(imageBuffer).digest('hex');
-  return hash.substring(0, 32); // Return first 32 characters as descriptor
+  if (!modelsLoaded) {
+    throw new Error('Face-api.js models not loaded yet');
+  }
+
+  try {
+    // Write temp file and load image via node-canvas
+    const tempPath = `/tmp/face_${Date.now()}.jpg`;
+    fs.writeFileSync(tempPath, imageBuffer);
+    const img = await loadImage(tempPath);
+
+    const detections = await faceapi
+      .detectSingleFace(img, new faceapi.TinyFaceDetectorOptions())
+      .withFaceLandmarks()
+      .withFaceDescriptor();
+
+    if (fs.existsSync(tempPath)) {
+      fs.unlinkSync(tempPath);
+    }
+
+    if (!detections) {
+      throw new Error('No face detected in image');
+    }
+
+    // Return the face descriptor as a Float32Array
+    return Array.from(detections.descriptor);
+  } catch (error) {
+    console.error('Face descriptor generation error:', error);
+    throw new Error('Failed to generate face descriptor: ' + error.message);
+  }
 }
 
 function findBestMatch(descriptor) {
   let bestMatch = null;
   let bestScore = 0;
-  const threshold = 0.7; // Minimum confidence threshold
+  const threshold = 0.6; // Face-api.js distance threshold (lower is better)
 
   for (const face of registeredFaces) {
-    // Simplified matching - in production, use proper face recognition algorithms
-    const similarity = calculateSimilarity(descriptor, face.descriptor);
-
-    if (similarity > threshold && similarity > bestScore) {
+    // Calculate Euclidean distance between face descriptors
+    const distance = calculateFaceDistance(descriptor, face.descriptor);
+    
+    // Convert distance to similarity score (lower distance = higher similarity)
+    const similarity = 1 - (distance / 2); // Normalize to 0-1 range
+    
+    if (distance < threshold && similarity > bestScore) {
       bestScore = similarity;
       bestMatch = {
         ensDomain: face.ensDomain,
         ownerAddress: face.ownerAddress,
         confidence: similarity,
+        distance: distance,
         registeredAt: face.registeredAt
       };
     }
@@ -837,14 +932,19 @@ function findBestMatch(descriptor) {
   return bestMatch;
 }
 
-function calculateSimilarity(desc1, desc2) {
-  // Simplified similarity calculation
-  // In production, use proper face recognition distance metrics
-  let matches = 0;
-  for (let i = 0; i < Math.min(desc1.length, desc2.length); i++) {
-    if (desc1[i] === desc2[i]) matches++;
+function calculateFaceDistance(desc1, desc2) {
+  // Calculate Euclidean distance between two face descriptors
+  if (desc1.length !== desc2.length) {
+    throw new Error('Face descriptors must have the same length');
   }
-  return matches / Math.max(desc1.length, desc2.length);
+  
+  let sum = 0;
+  for (let i = 0; i < desc1.length; i++) {
+    const diff = desc1[i] - desc2[i];
+    sum += diff * diff;
+  }
+  
+  return Math.sqrt(sum);
 }
 
 function updateFaceMatcher() {
@@ -858,7 +958,8 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    registeredFaces: registeredFaces.length
+    registeredFaces: registeredFaces.length,
+    faceRecognitionModels: modelsLoaded ? 'loaded' : 'loading'
   });
 });
 

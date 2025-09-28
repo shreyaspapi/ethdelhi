@@ -31,6 +31,7 @@ export default function RegisterPage() {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [registrationMessage, setRegistrationMessage] = useState('');
+  const [generatedMessage, setGeneratedMessage] = useState('');
   const [isRegistering, setIsRegistering] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
   const [messageSigned, setMessageSigned] = useState(false);
@@ -50,6 +51,16 @@ export default function RegisterPage() {
       fetchEnsData(address);
     }
   }, [isConnected, address]);
+
+  // Generate random message when component mounts
+  useEffect(() => {
+    const generateRandomMessage = () => {
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 15);
+      return `Face registration for ENS domain - ${timestamp}-${randomString}`;
+    };
+    setGeneratedMessage(generateRandomMessage());
+  }, []);
 
   const fetchEnsData = async (walletAddress: string) => {
     try {
@@ -145,8 +156,7 @@ export default function RegisterPage() {
     console.log('Starting signing process...');
     setIsSigning(true);
     try {
-      const message =
-        registrationMessage || `Registering face for ENS: ${ensData.ensName}`;
+      const message = generatedMessage;
 
       console.log('Signing message:', message);
       // Use wagmi's signMessage hook with proper mutation handling
@@ -187,8 +197,7 @@ export default function RegisterPage() {
 
     setIsRegistering(true);
     try {
-      const message =
-        registrationMessage || `Registering face for ENS: ${ensData.ensName}`;
+      const message = generatedMessage;
 
       // Convert base64 to blob
       const response = await fetch(capturedImage);
@@ -200,6 +209,7 @@ export default function RegisterPage() {
       formData.append('ensDomain', ensData.ensName as string);
       formData.append('signature', signature);
       formData.append('message', message);
+      formData.append('identifier', address);
 
       // Send to API
       const apiResponse = await fetch('/api/register-face', {
@@ -433,8 +443,7 @@ export default function RegisterPage() {
           <div className="text-center">
             <div className="text-6xl mb-4">✍️</div>
             <p>
-              Add a personal message and sign it to verify your ENS domain
-              ownership. This signature will be used to complete your
+              Sign a message to verify your ENS domain ownership. This signature will be used to complete your
               registration.
             </p>
           </div>
@@ -449,27 +458,12 @@ export default function RegisterPage() {
           ) : null}
 
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Personal Message (required)
-              </label>
-              <textarea
-                value={registrationMessage}
-                onChange={(e) => setRegistrationMessage(e.target.value)}
-                placeholder="Enter a personal message for your registration..."
-                className="w-full p-3 border rounded-lg resize-none"
-                rows={3}
-                required
-              />
-            </div>
-
             {!messageSigned ? (
               <div className="space-y-2">
                 <Button
                   onClick={handleSignMessage}
                   disabled={
                     isSigning ||
-                    !registrationMessage.trim() ||
                     !ensData?.ensName
                   }
                   className="w-full"
@@ -477,8 +471,7 @@ export default function RegisterPage() {
                   {isSigning ? 'Signing Message...' : 'Sign Message'}
                 </Button>
                 <div className="text-xs text-muted-foreground">
-                  Debug: isSigning={isSigning.toString()}, hasMessage=
-                  {registrationMessage.trim().length > 0}, hasEnsName=
+                  Debug: isSigning={isSigning.toString()}, hasEnsName=
                   {!!ensData?.ensName}
                 </div>
               </div>
